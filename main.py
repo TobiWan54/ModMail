@@ -980,4 +980,6 @@ async def eval(ctx, *, body: str):
             await ctx.send(f'```py\n{value}{ret}\n```')
 
 
-bot.run('token')
+with open('token.key', 'r') as token_file:
+    token = token_file.read()
+bot.run(token)
