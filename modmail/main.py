@@ -99,7 +99,7 @@ def is_mod(ctx):
     return ctx.guild is not None and ctx.author.top_role >= ctx.guild.get_role(config['mod_role_id'])
 
 
-def is_chivmail_channel(ctx):
+def is_modmail_channel(ctx):
     return isinstance(ctx.channel, discord.TextChannel) and ctx.channel.category.id == config['category_id'] and ctx.channel.topic
 
 
@@ -244,7 +244,7 @@ async def on_message(message):
 
     # Message from mod to user.
     else:
-        if not is_chivmail_channel(message) or (len(message.content) > 0 and message.content[0] == config['prefix']):
+        if not is_modmail_channel(message) or (len(message.content) > 0 and message.content[0] == config['prefix']):
             return
 
         user_id = message.channel.topic.split()[0]
@@ -282,7 +282,7 @@ async def on_message(message):
         try:
             user_message = await user.send(embed=user_embed, files=files_to_send)
         except discord.Forbidden:
-            await message.channel.send(embed=embed_creator('Failed to Send', 'User has server DMs disabled or has blocked ChivMail.', 'e'))
+            await message.channel.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
             return
         n = 0
         for attachment in user_message.attachments:
@@ -302,8 +302,8 @@ async def on_message(message):
 async def reply(ctx, *, message: str = ''):
     """Sends a non-anonymous message"""
 
-    if not is_chivmail_channel(ctx):
-        await ctx.send(embed=embed_creator('', 'This channel is not a ChivMail ticket.', 'e'))
+    if not is_modmail_channel(ctx):
+        await ctx.send(embed=embed_creator('', 'This channel is not a ticket.', 'e'))
         return
 
     user_id = ctx.channel.topic.split()[0]
@@ -341,7 +341,7 @@ async def reply(ctx, *, message: str = ''):
     try:
         user_message = await user.send(embed=user_embed, files=files_to_send)
     except discord.Forbidden:
-        await ctx.send(embed=embed_creator('Failed to Send', 'User has server DMs disabled or has blocked ChivMail.', 'e'))
+        await ctx.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
         return
     n = 0
     for attachment in user_message.attachments:
@@ -388,7 +388,7 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     try:
         user_message = await user.send(embed=user_embed, files=files_to_send)
     except discord.Forbidden:
-        await ctx.send(embed=embed_creator('Failed to Send', 'User has server DMs disabled or has blocked ChivMail.', 'e'))
+        await ctx.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
         return
 
     channel_embed = embed_creator('Message Sent', message, 'r', user, ctx.author)
@@ -430,8 +430,8 @@ async def send(ctx, user: discord.User, *, message: str = ''):
 async def close(ctx, *, reason: str = ''):
     """Anonymously closes a ticket"""
 
-    if not is_chivmail_channel(ctx):
-        await ctx.send(embed=embed_creator('', 'This channel is not a valid ChivMail ticket.', 'e'))
+    if not is_modmail_channel(ctx):
+        await ctx.send(embed=embed_creator('', 'This channel is not a valid ticket.', 'e'))
         return
 
     if len(reason) > 1024:
@@ -529,7 +529,7 @@ async def close(ctx, *, reason: str = ''):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ChivMail Log</title>
+<title>'''+bot.user.name+'''Log</title>
 <style type="text/css">
     html { }
     body { font-size:16px; max-width:1000px; margin: 20px auto; padding:0; font-family:sans-serif; color:white; background:#2D2F33; }
@@ -550,7 +550,7 @@ async def close(ctx, *, reason: str = ''):
 </style>
 <script async src='/cdn-cgi/bm/cv/669835187/api.js'></script></head>
 <body>
-<h1>ChivMail</h1>
+<h1>'''+bot.user.name+'''</h1>
 <main>        
     <ul>
             '''
@@ -656,8 +656,8 @@ async def close(ctx, *, reason: str = ''):
 async def snippet(ctx, name: str):
     """Sends a snippet. Use sub-commands to manage"""
 
-    if not is_chivmail_channel(ctx):
-        await ctx.send(embed=embed_creator('', 'This channel is not a valid ChivMail ticket.', 'e'))
+    if not is_modmail_channel(ctx):
+        await ctx.send(embed=embed_creator('', 'This channel is not a ticket.', 'e'))
         return
 
     name = name.lower()
@@ -814,7 +814,7 @@ async def add(ctx, user: discord.User, *, reason: str = ''):
         return
 
     if ctx.guild in user.mutual_guilds:
-        query_msg = f'Are you sure you want to blacklist **{user}** from ChivMail? They will be messaged with the reason given.'
+        query_msg = f'Are you sure you want to blacklist **{user}** from {bot.user.name}? They will be messaged with the reason given.'
     else:
         query_msg = f'Are you sure you want to blacklist **{user}**? They are not in this server, and will not receive a notifying message.'
 
@@ -831,17 +831,17 @@ async def add(ctx, user: discord.User, *, reason: str = ''):
     with open('blacklist.json', 'w') as file:
         json.dump(blacklist_list, file)
 
-    embed_user = embed_creator('Access Revoked', 'Your access to ChivMail has been revoked by the moderators. You will no longer be able to send messages here.', 'r', ctx.guild)
-    confirmation_msg = f'**{user}** has been blacklisted. They will no longer be able to message ChivMail. User notified by direct message.'
+    embed_user = embed_creator('Access Revoked', f'Your access to {bot.user.name} has been revoked by the moderators. You will no longer be able to send messages here.', 'r', ctx.guild)
+    confirmation_msg = f'**{user}** has been blacklisted. They will no longer be able to message {bot.user.name}. User notified by direct message.'
     if reason:
         embed_user.add_field(name='Reason', value=reason)
     if ctx.guild in user.mutual_guilds:
         try:
             await user.send(embed=embed_user)
         except discord.Forbidden:
-            confirmation_msg = f'**{user}** has been blacklisted. They will no longer be able to message ChivMail. Failed to message user: DMs blocked.'
+            confirmation_msg = f'**{user}** has been blacklisted. They will no longer be able to message {bot.user.name}. Failed to message user: DMs blocked.'
     else:
-        confirmation_msg = f'**{user}** has been blacklisted. They will no longer be able to message ChivMail. Failed to message user: not in server.'
+        confirmation_msg = f'**{user}** has been blacklisted. They will no longer be able to message {bot.user.name}. Failed to message user: not in server.'
     embed_guild = embed_creator('Blacklist Updated', confirmation_msg, 'b')
     if reason:
         embed_guild.add_field(name='Reason', value=reason)
@@ -856,7 +856,7 @@ async def remove(ctx, user_id: int):
         blacklist_list.remove(user_id)
         with open('blacklist.json', 'w') as file:
             json.dump(blacklist_list, file)
-        await ctx.send(embed=embed_creator('Blacklist Updated', f'User with ID `{user_id}` has been un-blacklisted. They can now message ChivMail.', 'b'))
+        await ctx.send(embed=embed_creator('Blacklist Updated', f'User with ID `{user_id}` has been un-blacklisted. They can now message {bot.user.name}.', 'b'))
     else:
         await ctx.send(embed=embed_creator('', f'User with ID `{user_id}` is not blacklisted.', 'e'))
 
