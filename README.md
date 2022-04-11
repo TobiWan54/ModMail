@@ -9,7 +9,7 @@ Please note that I am not hosting this bot. If you want to use it, you will have
 and Google Cloud both have free tiers that provide sufficiently-resourced instances.
 
 ## Configuration
-This is simple. Fill out the `config.json` file and put it in the same directory as the main script.
+This is simple. Fill out the `config.json` file in `templates` and put it in the same directory as the main script, along with the other `.json` files.
 
 The bot has three permission levels:
 - bot owner (this is NOT the server owner, but whoever is hosting the bot) - has access to the `eval` command
