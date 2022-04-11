@@ -1,0 +1,12 @@
+{
+  "token":  "OTM5NDYxMTQ0ODE5NjgzMzQ5.Yf5LXw.lPVK0smY1Y_jCAFm11QsksDdxcY",
+  "guild_id": 857550920668545034,
+  "category_id": 939468232459431947,
+  "log_channel_id": 939468310981005333,
+  "helper_role_id": 923198355444748308,
+  "mod_role_id": 923198314969706538,
+  "bot_owner_id": 402499489316995083,
+  "prefix": "=",
+  "open_message": "Hello there! Thanks for reaching out to ChivMail here on the official Chivalry 2 Discord server. A moderator will get to your message as soon as they are able. If you are enquiring about an in-game mute or ban, please open a ticket on the support site instead: https://support.chivalry2.com/.",
+  "close_message": "If you want to contact the mods about something else, send another message to open a new ticket."
+}
