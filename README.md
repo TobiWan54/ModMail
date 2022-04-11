@@ -26,4 +26,4 @@ https://github.com/mozilla/bleach. This is available in PyPI, so can be easily i
 
 ### discord.py
 https://github.com/Rapptz/discord.py. Modmail requires version `2.0.0a`, which is under active development and has relatively frequent breaking changes.
-[This](https://github.com/Rapptz/discord.py/tree/5892bbd8b44fc8cff6b5bd2e476249e0a3d313c5) is the latest commit I have tested as working.
+[This version](https://github.com/Rapptz/discord.py/tree/5892bbd8b44fc8cff6b5bd2e476249e0a3d313c5) is the latest commit that has been tested as working.
