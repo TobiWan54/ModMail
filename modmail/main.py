@@ -16,15 +16,6 @@ import sys
 import functools
 
 
-guild_id = 857550920668545034
-category_id = 939468232459431947
-log_channel_id = 939468310981005333
-helper_id = 923198355444748308
-mod_id = 923198314969706538
-tobi_id = 402499489316995083
-prefix = '='
-
-
 class YesNoButtons(discord.ui.View):
     def __init__(self):
         super().__init__()
@@ -41,23 +32,17 @@ class YesNoButtons(discord.ui.View):
         self.stop()
 
 
+with open('config.json', 'r') as config_file:
+    config = json.load(config_file)
+
 with open('snippets.json', 'r') as snippets_file:
-    try:
-        snippets = json.load(snippets_file)
-    except json.JSONDecodeError:
-        snippets = {}
+    snippets = json.load(snippets_file)
 
 with open('blacklist.json', 'r') as blacklist_file:
-    try:
-        blacklist_list = json.load(blacklist_file)
-    except json.JSONDecodeError:
-        blacklist_list = []
+    blacklist_list = json.load(blacklist_file)
 
 with open('logs.json', 'r') as logs_file:
-    try:
-        logs = json.load(logs_file)
-    except json.JSONDecodeError:
-        logs = {}
+    logs = json.load(logs_file)
 
 
 html_sanitiser = bleach.sanitizer.Cleaner()
@@ -67,13 +52,13 @@ tickets = {}
 
 
 async def refresh_tickets():
-    category = bot.get_channel(category_id)
+    category = bot.get_channel(config['category_id'])
     for channel in category.text_channels:
         if channel.topic is not None:
             try:
                 tickets[int(channel.topic.split()[0])] = channel.id
             except ValueError:
-                await channel.send(embed=embed_creator('Ticket is Broken', f"Please change this channel's topic to the user's ID, then use `{prefix}refresh`", 'e'))
+                await channel.send(embed=embed_creator('Ticket is Broken', f"Please change this channel's topic to the user's ID, then use `{config['prefix']}refresh`", 'e'))
 
 
 def embed_creator(title, message, colour=None, subject=None, author=None, anon=True, time=False):
@@ -107,23 +92,23 @@ def embed_creator(title, message, colour=None, subject=None, author=None, anon=T
 
 
 def is_helper(ctx):
-    return ctx.guild is not None and ctx.author.top_role >= ctx.guild.get_role(helper_id)
+    return ctx.guild is not None and ctx.author.top_role >= ctx.guild.get_role(config['helper_role_id'])
 
 
 def is_mod(ctx):
-    return ctx.guild is not None and ctx.author.top_role >= ctx.guild.get_role(mod_id)
+    return ctx.guild is not None and ctx.author.top_role >= ctx.guild.get_role(config['mod_role_id'])
 
 
 def is_chivmail_channel(ctx):
-    return isinstance(ctx.channel, discord.TextChannel) and ctx.channel.category.id == category_id and ctx.channel.topic
+    return isinstance(ctx.channel, discord.TextChannel) and ctx.channel.category.id == config['category_id'] and ctx.channel.topic
 
 
-def is_tobi(ctx):
-    return ctx.author.id == tobi_id
+def is_bot_owner(ctx):
+    return ctx.author.id == config['bot_owner_id']
 
 
 help_command = commands.DefaultHelpCommand(command_attrs={'checks': [is_helper]}, no_category='Commands')
-bot = commands.Bot(command_prefix=prefix, intents=discord.Intents.all(), activity=discord.Game('DM to Contact Mods'),
+bot = commands.Bot(command_prefix=config['prefix'], intents=discord.Intents.all(), activity=discord.Game('DM to Contact Mods'),
                    help_command=help_command)
 
 
@@ -174,9 +159,9 @@ async def error_handler(error, message=None):
     if len(tb) > 2000:
         with open('error.txt', 'w') as tb_file:
             tb_file.write(tb)
-        await bot.get_user(tobi_id).send(file=discord.File(io.BytesIO(tb.encode('utf-8')), filename='error.txt'), embed=embed)
+        await bot.get_user(config['bot_owner_id']).send(file=discord.File(io.BytesIO(tb.encode('utf-8')), filename='error.txt'), embed=embed)
     else:
-        await bot.get_user(tobi_id).send(f'```py\n{tb}```', embed=embed)
+        await bot.get_user(config['bot_owner_id']).send(f'```py\n{tb}```', embed=embed)
 
 
 @bot.event
@@ -206,7 +191,7 @@ async def on_message(message):
         if message.author.id in blacklist_list:
             return
 
-        guild = bot.get_guild(guild_id)
+        guild = bot.get_guild(config['guild_id'])
         ticket_id = tickets.get(message.author.id)
         if ticket_id == 0:
             return
@@ -215,11 +200,11 @@ async def on_message(message):
             ticket_create = True
             tickets[message.author.id] = 0
             channel = await guild.create_text_channel(f'{message.author.name} {message.author.discriminator}',
-                                                      category=bot.get_channel(category_id),
+                                                      category=bot.get_channel(config['category_id']),
                                                       topic=f'{message.author.id} (User ID, do not change)')
-            await bot.get_channel(log_channel_id).send(embed=embed_creator('New Ticket', '', 'g', message.author))
+            await bot.get_channel(config['log_channel_id']).send(embed=embed_creator('New Ticket', '', 'g', message.author))
             embed = embed_creator('New Ticket',
-                                  f'Replies are anonymous by default, and messages starting with `{prefix}` are ignored (although using the discussion thread is preferable). Use `{prefix}reply` to send a non-anonymous reply. Use `{prefix}close` to close anonymously.',
+                                  f'Replies are anonymous by default, and messages starting with `{config["prefix"]}` are ignored (although using the discussion thread is preferable). Use `{config["prefix"]}reply` to send a non-anonymous reply. Use `{config["prefix"]}close` to close anonymously.',
                                   'b', message.author, time=True)
             embed.add_field(name='User', value=f'{message.author.mention} ({message.author.id})')
             header = await channel.send(embed=embed)
@@ -255,20 +240,18 @@ async def on_message(message):
         await channel.send(embed=ticket_embed, files=files)
         await confirmation_message.edit(embed=user_embed)
         if ticket_create:
-            await message.channel.send(embed=embed_creator('Ticket Created',
-                                                           'Hello there! Thanks for reaching out to ChivMail here on the official Chivalry 2 Discord server. A moderator will get to your message as soon as they are able. If you are enquiring about an in-game mute or ban, please open a ticket on the support site instead: https://support.chivalry2.com/.',
-                                                           'b', guild))
+            await message.channel.send(embed=embed_creator('Ticket Created', config['open_message'], 'b', guild))
 
     # Message from mod to user.
     else:
-        if not is_chivmail_channel(message) or (len(message.content) > 0 and message.content[0] == prefix):
+        if not is_chivmail_channel(message) or (len(message.content) > 0 and message.content[0] == config['prefix']):
             return
 
         user_id = message.channel.topic.split()[0]
         try:
             user_id = int(user_id)
         except ValueError:
-            await message.channel.send(embed=embed_creator('Failed to Send', f"User ID retrieved from channel topic as `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{prefix}refresh`", 'e'))
+            await message.channel.send(embed=embed_creator('Failed to Send', f"User ID retrieved from channel topic as `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config['prefix']}refresh`", 'e'))
             return
         user = bot.get_user(user_id)
         if user is not None:
@@ -279,7 +262,7 @@ async def on_message(message):
             try:
                 await bot.fetch_user(user_id)
             except discord.NotFound:
-                await message.channel.send(embed=embed_creator('Failed to Send', f"User with ID retrieved from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{prefix}refresh`. Otherwise, the user may have deleted their account.", 'e'))
+                await message.channel.send(embed=embed_creator('Failed to Send', f"User with ID retrieved from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config['prefix']}refresh`. Otherwise, the user may have deleted their account.", 'e'))
             else:
                 await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
             return
@@ -327,7 +310,7 @@ async def reply(ctx, *, message: str = ''):
     try:
         user_id = int(user_id)
     except ValueError:
-        await ctx.send(embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{prefix}refresh`", 'e'))
+        await ctx.send(embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config['prefix']}refresh`", 'e'))
         return
     user = bot.get_user(user_id)
     if user is not None:
@@ -338,7 +321,7 @@ async def reply(ctx, *, message: str = ''):
         try:
             await bot.fetch_user(user_id)
         except discord.NotFound:
-            await ctx.channel.send(embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{prefix}refresh`. Otherwise, the user have may deleted their account.", 'e'))
+            await ctx.channel.send(embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config['prefix']}refresh`. Otherwise, the user have may deleted their account.", 'e'))
         else:
             await ctx.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
         return
@@ -415,13 +398,13 @@ async def send(ctx, user: discord.User, *, message: str = ''):
         channel_embed.add_field(name=f'Attachment {n}', value=attachment.url, inline=False)
 
     channel = await ctx.guild.create_text_channel(f'{user.name} {user.discriminator}',
-                                                  category=bot.get_channel(category_id),
+                                                  category=bot.get_channel(config['category_id']),
                                                   topic=f'{user.id} (User ID, do not change)')
     tickets[user.id] = channel.id
-    await bot.get_channel(log_channel_id).send(embed=embed_creator('Ticket Created', '', 'r', user, ctx.author, anon=False))
+    await bot.get_channel(config['log_channel_id']).send(embed=embed_creator('Ticket Created', '', 'r', user, ctx.author, anon=False))
 
     embed = embed_creator('Ticket Created by Moderator',
-                          f'Replies are anonymous by default, and messages starting with `{prefix}` are ignored (although using the discussion thread is preferable). Use `{prefix}reply` to send a non-anonymous reply. Use `{prefix}close` to close anonymously.',
+                          f'Replies are anonymous by default, and messages starting with `{config["prefix"]}` are ignored (although using the discussion thread is preferable). Use `{config["prefix"]}reply` to send a non-anonymous reply. Use `{config["prefix"]}close` to close anonymously.',
                           'b', user, time=True)
     embed.add_field(name='User', value=f'{user.mention} ({user.id})')
     header = await channel.send(embed=embed)
@@ -644,15 +627,14 @@ async def close(ctx, *, reason: str = ''):
             </html>
             '''
         )
-    embed_user = embed_creator('Ticket Closed', 'If you want to contact the mods about something else, send another message to open a new ticket.',
-                               'b', ctx.guild, time=True)
+    embed_user = embed_creator('Ticket Closed', config['close_message'], 'b', ctx.guild, time=True)
     embed_guild = embed_creator('Ticket Closed', '', 'r', user, ctx.author, anon=False)
     if reason:
         embed_user.add_field(name='Reason', value=reason)
         embed_guild.add_field(name='Reason', value=reason)
     embed_guild.add_field(name='User', value=f'<@{user_id}> ({user_id})', inline=False)
-    log = await bot.get_channel(log_channel_id).send(embed=embed_guild, files=[discord.File(f'{user_id}.txt', filename='log.txt'),
-                                                                               discord.File(f'{user_id}.htm', filename='log.htm')])
+    log = await bot.get_channel(config['log_channel_id']).send(embed=embed_guild, files=[discord.File(f'{user_id}.txt', filename='log.txt'),
+                                                                                         discord.File(f'{user_id}.htm', filename='log.htm')])
     if str(user_id) in logs:
         logs[str(user_id)].append(log.id)
     else:
@@ -686,7 +668,7 @@ async def snippet(ctx, name: str):
         try:
             user_id = int(user_id)
         except ValueError:
-            await ctx.send(embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{prefix}refresh`", 'e'))
+            await ctx.send(embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config['prefix']}refresh`", 'e'))
             return
         user = bot.get_user(user_id)
         if user is not None:
@@ -697,7 +679,7 @@ async def snippet(ctx, name: str):
             try:
                 await bot.fetch_user(user_id)
             except discord.NotFound:
-                await ctx.send(embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{prefix}refresh`. Otherwise, the user may have deleted their account.", 'e'))
+                await ctx.send(embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config['prefix']}refresh`. Otherwise, the user may have deleted their account.", 'e'))
             else:
                 await ctx.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
             return
@@ -740,7 +722,7 @@ async def add(ctx, name: str, *, content: str):
         await ctx.send(embed=embed_creator('', 'Maximum number of snippets already reached: 25.', 'e'))
         return
     if name in snippets:
-        await ctx.send(embed=embed_creator('', f'Snippet `{name}` already exists. Use `{prefix}snippet edit {name} ...` to change it.', 'e'))
+        await ctx.send(embed=embed_creator('', f'Snippet `{name}` already exists. Use `{config["prefix"]}snippet edit {name} ...` to change it.', 'e'))
         return
     if name in ('view', 'add', 'edit', 'remove'):
         await ctx.send(embed=embed_creator('', 'Snippets cannot be named `view`, `add`, `edit` or `remove`.', 'e'))
@@ -886,7 +868,7 @@ async def search(ctx, user: discord.User, *, search_term: str = None):
 
     searching = await ctx.send(embed=embed_creator('Searching...', 'This may take up to several minutes.', 'b'))
 
-    log_channel = bot.get_channel(log_channel_id)
+    log_channel = bot.get_channel(config['log_channel_id'])
     log_messages = logs.get(str(user.id), [])
     embeds = [embed_creator(f'Tickets for {user}', '', 'b')]
     for message_id in log_messages:
@@ -938,7 +920,7 @@ async def refresh(ctx):
 
 
 @bot.command()
-@commands.check(is_tobi)
+@commands.check(is_bot_owner)
 async def eval(ctx, *, body: str):
     # Copied from Danny's bot, R. Danny, with a few small changes.
 
@@ -965,7 +947,7 @@ async def eval(ctx, *, body: str):
         try:
             await ctx.send(f'```py\n{value}{traceback.format_exc()}\n```')
         except discord.HTTPException:
-            await bot.get_user(tobi_id).send(f'```py\n{value}{traceback.format_exc()}\n```')
+            await bot.get_user(config['bot_owner_id']).send(f'```py\n{value}{traceback.format_exc()}\n```')
     else:
         value = stdout.getvalue()
         try:
@@ -980,6 +962,4 @@ async def eval(ctx, *, body: str):
             await ctx.send(f'```py\n{value}{ret}\n```')
 
 
-with open('token.key', 'r') as token_file:
-    token = token_file.read()
-bot.run(token)
+bot.run(config['token'])
