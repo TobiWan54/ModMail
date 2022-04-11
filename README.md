@@ -19,7 +19,7 @@ The bot has three permission levels:
 If you do not have a helper role in your server, set `helper_role_id` to the same value as `mod_role_id`. 
 
 ## Dependancies
-Modmail requires the following Python packages to also be installed.
+Modmail requires Python 3.10+ as well as the following Python packages.
 
 ### bleach
 https://github.com/mozilla/bleach. This is available in PyPI, so can be easily installed with pip. The latest version that has been tested as working is `5.0.0`.
