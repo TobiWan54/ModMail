@@ -1,6 +1,0 @@
-[submodule "discord.py"]
-	path = discord.py
-	url = https://github.com/Rapptz/discord.py
-[submodule "bleach"]
-	path = bleach
-	url = https://github.com/mozilla/bleach
