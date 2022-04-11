@@ -17,3 +17,13 @@ The bot has three permission levels:
 - helper - has access to everything except the blacklist
 
 If you do not have a helper role in your server, set `helper_role_id` to the same value as `mod_role_id`. 
+
+## Dependancies
+Modmail requires the following Python packages to also be installed.
+
+### bleach
+https://github.com/mozilla/bleach. This is available in PyPI, so can be easily installed with pip. The latest version that has been tested as working is `5.0.0`.
+
+### discord.py
+https://github.com/Rapptz/discord.py. Modmail requires version `2.0.0a`, which is under active development and has relatively frequent breaking changes.
+[This](https://github.com/Rapptz/discord.py/tree/5892bbd8b44fc8cff6b5bd2e476249e0a3d313c5) is the latest commit I have tested as working.
