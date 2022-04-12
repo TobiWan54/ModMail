@@ -12,7 +12,7 @@ and Google Cloud both have free tiers that provide sufficiently-resourced instan
 This is simple. Fill out the `config.json` file in `templates` and put it in the same directory as the main script, along with the other `.json` files.
 
 The bot has three permission levels:
-- bot owner (this is NOT the server owner, but whoever is hosting the bot) - has access to the `eval` command
+- bot owner - has access to the `eval` command. This is independant of `bot_owner_id` in the config, which determines the user to send error tracebacks to.
 - moderator - has access to everything
 - helper - has access to everything except the blacklist
 
