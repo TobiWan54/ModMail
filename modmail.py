@@ -1,9 +1,6 @@
-# Python v3.10
-
-import discord  # v2.0.0a from https://github.com/Rapptz/discord.py
+import discord
 from discord.ext import commands
-import bleach  # v5.0.0
-# Builtin modules
+import bleach
 import datetime
 import os
 import textwrap
@@ -284,10 +281,8 @@ async def on_message(message):
         except discord.Forbidden:
             await message.channel.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
             return
-        n = 0
-        for attachment in user_message.attachments:
-            n += 1
-            channel_embed.add_field(name=f'Attachment {n}', value=attachment.url, inline=False)
+        for index, attachment in enumerate(user_message.attachments):
+            channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
         await message.delete()
         # Must be rebuilt because a discord.File object can only be used once.
         files_to_send = []
@@ -343,10 +338,8 @@ async def reply(ctx, *, message: str = ''):
     except discord.Forbidden:
         await ctx.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
         return
-    n = 0
-    for attachment in user_message.attachments:
-        n += 1
-        channel_embed.add_field(name=f'Attachment {n}', value=attachment.url, inline=False)
+    for index, attachment in enumerate(user_message.attachments):
+        channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
     await ctx.message.delete()
     # Must be rebuilt because a discord.File object can only be used once.
     files_to_send = []
@@ -392,10 +385,8 @@ async def send(ctx, user: discord.User, *, message: str = ''):
         return
 
     channel_embed = embed_creator('Message Sent', message, 'r', user, ctx.author)
-    n = 0
-    for attachment in user_message.attachments:
-        n += 1
-        channel_embed.add_field(name=f'Attachment {n}', value=attachment.url, inline=False)
+    for index, attachment in enumerate(user_message.attachments):
+        channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
 
     channel = await ctx.guild.create_text_channel(f'{user.name} {user.discriminator}',
                                                   category=bot.get_channel(config['category_id']),
