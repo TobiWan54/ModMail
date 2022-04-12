@@ -29,6 +29,16 @@ class YesNoButtons(discord.ui.View):
         self.stop()
 
 
+class HelpCommand(commands.DefaultHelpCommand):
+    def __init__(self):
+        super().__init__(command_attrs={'checks': [is_helper]})
+        self.no_category = 'Commands'
+        self.add_check(is_helper)
+
+    def get_ending_note(self) -> str:
+        return f'Type {config["prefix"]}help command for more info on a command.'
+
+
 with open('config.json', 'r') as config_file:
     config = json.load(config_file)
 
@@ -104,9 +114,8 @@ def is_bot_owner(ctx):
     return ctx.author.id == config['bot_owner_id']
 
 
-help_command = commands.DefaultHelpCommand(command_attrs={'checks': [is_helper]}, no_category='Commands')
 bot = commands.Bot(command_prefix=config['prefix'], intents=discord.Intents.all(), activity=discord.Game('DM to Contact Mods'),
-                   help_command=help_command)
+                   help_command=HelpCommand())
 
 
 @bot.event
