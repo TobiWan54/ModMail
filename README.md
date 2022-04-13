@@ -61,5 +61,5 @@ although future versions are very likely to carry on working.
 
 #### [discord.py](https://github.com/Rapptz/discord.py)
 Modmail requires version 2.0, which currently must be installed from github: `pip install -U git+https://github.com/Rapptz/discord.py`.
-Since this is under active development there are relatively frequent breaking changes. This fork is of an unchanged version that has been
+Since this is under active development there are relatively frequent breaking changes. The following fork is of an unchanged version that has been
 tested as working, and will be updated so that it always works with the latest version of ModMail: https://github.com/TobiWan54/discord.py
