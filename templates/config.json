@@ -1,11 +1,11 @@
 {
   "token": "token",
-  "guild_id": 000000000000000000,
-  "category_id": 000000000000000000,
-  "log_channel_id": 000000000000000000,
-  "helper_role_id": 000000000000000000,
-  "mod_role_id": 000000000000000000,
-  "bot_owner_id": 000000000000000000,
+  "guild_id": 999999999999999999,
+  "category_id": 999999999999999999,
+  "log_channel_id": 999999999999999999,
+  "helper_role_id": 999999999999999999,
+  "mod_role_id": 999999999999999999,
+  "bot_owner_id": 999999999999999999,
   "prefix": "prefix",
   "open_message": "open_message",
   "close_message": "close_message"
