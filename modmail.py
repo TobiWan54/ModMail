@@ -53,6 +53,10 @@ class Config:
     open_message: str
     close_message: str
 
+    def update(self, new: dict):
+        for key, value in new.items():
+            setattr(self, key, value)
+
 
 with open('config.json', 'r') as config_file:
     config = Config(**json.load(config_file))
@@ -73,7 +77,7 @@ html_linkifier = bleach.sanitizer.Cleaner(filters=[functools.partial(bleach.link
 tickets = {}
 
 
-async def refresh_tickets():
+async def refresh_func():
     category = bot.get_channel(config.category_id)
     for channel in category.text_channels:
         if channel.topic is not None:
@@ -81,6 +85,8 @@ async def refresh_tickets():
                 tickets[int(channel.topic.split()[0])] = channel.id
             except ValueError:
                 await channel.send(embed=embed_creator('Ticket is Broken', f"Please change this channel's topic to the user's ID, then use `{config.prefix}refresh`", 'e'))
+    with open('config.json', 'r') as file:
+        config.update(json.load(file))
 
 
 def embed_creator(title, message, colour=None, subject=None, author=None, anon=True, time=False):
@@ -132,7 +138,7 @@ bot = commands.Bot(command_prefix=config.prefix, intents=discord.Intents.all(), 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
-    await refresh_tickets()
+    await refresh_func()
 
 
 async def error_handler(error, message=None):
@@ -926,7 +932,7 @@ async def ping(ctx):
 async def refresh(ctx):
     """May fix some ticket-related issues"""
 
-    await refresh_tickets()
+    await refresh_func()
     await ctx.message.add_reaction('\u2705')
 
 
