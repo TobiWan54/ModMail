@@ -2,28 +2,64 @@
 A Modmail bot for Discord.
 
 I originally made this as a custom project for the official Chivalry 2 Discord server, but it is now server-agnostic.
-Although it is not a fork of the widely-used [Modmail bot made by Kyber](https://github.com/kyb3r/modmail), 
-its user experience is heavily inspired by it and will be very similar, with some improvements and additional features (but also a few missing ones).
+Although it is not a fork of the widely-used Modmail bot made by Kyber: https://github.com/kyb3r/modmail, the experience will be very similar.
 
-Please note that I am not hosting this bot. If you want to use it, you will have to host it yourself. Oracle Cloud
-and Google Cloud both have free tiers that provide sufficiently-resourced instances.
+Message me on Discord if you have any questions, or if you need any help with using it.
 
-## Configuration
-This is simple. Fill out the `config.json` file in `templates` and put it in the same directory as the main script, along with the other `.json` files.
+## Features
+When a user messages the bot, a new channel is created in a category in your server, representing a ticket. As you would expect from a Modmail bot, 
+all the messages in the ticket are logged when the ticket is closed. You can also blacklist users for misuse, and set pre-defined snippets which can 
+be sent with a single command.
 
-The bot has three permission levels:
-- bot owner (this is NOT the server owner, but whoever is hosting the bot) - has access to the `eval` command
-- moderator - has access to everything
-- helper - has access to everything except the blacklist
+However, this bot has a few additional features that make it unique:
 
-If you do not have a helper role in your server, set `helper_role_id` to the same value as `mod_role_id`. 
+- **Discussion Threads:**  Each ticket channel has a thread automatically created which is also logged when the ticket is closed.
+This allows mods to discuss freely, without the risk of accidentally sending a rude message to the user!
 
-## Dependancies
-Modmail requires Python 3.10+ as well as the following Python packages.
+- **!search:** Allows you to retrieve the logs of a user's previous tickets, and to search for specific phrases within those tickets.
 
-### bleach
-https://github.com/mozilla/bleach. This is available in PyPI, so can be easily installed with pip. The latest version that has been tested as working is `5.0.0`.
+- **!send:** Creates a new ticket and sends an anonymous message to a user that does not already have a ticket open.
 
-### discord.py
-https://github.com/Rapptz/discord.py. Modmail requires version `2.0.0a`, which is under active development and has relatively frequent breaking changes.
-[This version](https://github.com/Rapptz/discord.py/tree/5892bbd8b44fc8cff6b5bd2e476249e0a3d313c5) is the latest commit that has been tested as working.
+Once you have the bot running, the !help command will show you a list of all the available commands and their sub-commands.
+
+## Setup
+
+To use this bot, you will have to create a bot account for it on the [Discord Developer Portal](https://discord.com/developers)
+and host the script yourself. Oracle Cloud and Google Cloud both have free tiers that provide sufficiently-resourced instances 
+(virtual machines) for hosting.
+
+The script requires Python 3.10 or higher and the packages listed under Dependancies.
+
+### Configuration
+Fill out the `config.json` file in [templates](https://github.com/TobiWan54/ModMail/tree/main/templates) and put it in the same 
+directory as `modmail.py`. Then add the other `.json` files - there is no need to change these.
+When that's all done you can run the script, and your bot will be online!
+
+#### config.json
+
+- `token` is your bot account's token from the Discord Developer Portal.
+- `guild_id` is your server's ID.
+- `category_id` is the ID of the category that tickets to be created in. You will have to create this yourself.
+- `log_channel_id` is the ID of the channel that ticket logs will be sent in.
+You will have to create this yourself - if it is the tickets category, make sure it has no topic or it will break the bot.
+- `helper_role_id` is the ID of your server's helper role, which can use everything except the blacklist.
+If you do not have a helper role, set this to the same value as `mod_role_id`.
+- `mod_role_id` is the ID of your server's moderator role, which can use everything.
+- `bot_owner_id` is the ID of the user that error tracebacks will be DM'd to. Access to the !eval command, which allows you to run code,
+is given to the bot owner(s) in the Discord Developer Portal, not this user (although they will likely be the same user).
+- `prefix` is the bot's prefix.
+- `open_message` is the text that users will receive under "Ticket Created" when they open a ticket.
+- `close_message` is the text that users will receive under "Ticket Closed" when a mod closes their ticket.
+
+The !refresh command will make the script re-read the config file, so you can change these values without restarting the bot.
+
+### Dependancies
+
+#### [bleach](https://github.com/mozilla/bleach)
+This is in PyPI so is simple to install: `pip install bleach`. The latest version that has been tested is 5.0.0, 
+although future versions are very likely to carry on working.
+
+#### [discord.py](https://github.com/Rapptz/discord.py)
+Modmail requires version 2.0, which currently must be installed from github: `pip install -U git+https://github.com/Rapptz/discord.py`.
+Since this is under active development there are relatively frequent breaking changes. The following fork is of an unchanged version that has been
+tested as working, and will be updated so that it always works with the latest version of ModMail: https://github.com/TobiWan54/discord.py
