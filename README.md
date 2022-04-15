@@ -35,6 +35,8 @@ Fill out the `config.json` file in [templates](https://github.com/TobiWan54/ModM
 directory as `modmail.py`. Then add the other `.json` files - there is no need to change these.
 When that's all done you can run the script, and your bot will be online!
 
+Ticket logs are indexed in an SQLite database, `logs.db`. This is automatically created by the script, so do not delete it.
+
 #### config.json
 
 - `token` is your bot account's token from the Discord Developer Portal.
