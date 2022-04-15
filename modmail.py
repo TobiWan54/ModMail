@@ -81,7 +81,7 @@ html_linkifier = bleach.sanitizer.Cleaner(filters=[functools.partial(bleach.link
 tickets = {}
 
 
-async def refresh_func():
+async def load_tickets():
     category = bot.get_channel(config.category_id)
     for channel in category.text_channels:
         if channel.topic is not None:
@@ -140,7 +140,7 @@ bot = commands.Bot(command_prefix=config.prefix, intents=discord.Intents.all(), 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
-    await refresh_func()
+    await load_tickets()
 
 
 async def error_handler(error, message=None):
@@ -886,7 +886,10 @@ async def remove(ctx, user_id: int):
 async def search(ctx, user: discord.User, *, search_term: str = None):
     """Returns ticket logs"""
 
-    searching = await ctx.send(embed=embed_creator('Searching...', 'This may take up to several minutes.', 'b'))
+    if search_term is not None:
+        searching = await ctx.send(embed=embed_creator('Searching...', 'This may take a while.', 'b'))
+    else:
+        searching = None
 
     embeds = [embed_creator(f'Tickets for {user}', '', 'b')]
     with sqlite3.connect('logs.db') as conn:
@@ -907,7 +910,8 @@ async def search(ctx, user: discord.User, *, search_term: str = None):
 
             embeds[-1].description += f'• <t:{int(timestamp)}:D> {htm_log_url}\n'
 
-    await searching.delete()
+    if searching is not None:
+        await searching.delete()
     for embed in embeds:
         await ctx.send(embed=embed)
 
@@ -923,7 +927,9 @@ async def ping(ctx):
 async def refresh(ctx):
     """May fix some ticket-related issues"""
 
-    await refresh_func()
+    with open('config.json', 'r') as file:
+        config.update(json.load(file))
+    await load_tickets()
     await ctx.message.add_reaction('\u2705')
 
 
