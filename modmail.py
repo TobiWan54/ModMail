@@ -12,6 +12,8 @@ import mimetypes
 import sys
 import functools
 import dataclasses
+import sqlite3
+import aiohttp
 
 
 class YesNoButtons(discord.ui.View):
@@ -67,8 +69,10 @@ with open('snippets.json', 'r') as snippets_file:
 with open('blacklist.json', 'r') as blacklist_file:
     blacklist_list = json.load(blacklist_file)
 
-with open('logs.json', 'r') as logs_file:
-    logs = json.load(logs_file)
+with sqlite3.connect('logs.db') as connection:
+    cursor = connection.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS logs (user_id, timestamp, txt_log_url, htm_log_url)')
+    connection.commit()
 
 
 html_sanitiser = bleach.sanitizer.Cleaner()
@@ -85,8 +89,6 @@ async def refresh_func():
                 tickets[int(channel.topic.split()[0])] = channel.id
             except ValueError:
                 await channel.send(embed=embed_creator('Ticket is Broken', f"Please change this channel's topic to the user's ID, then use `{config.prefix}refresh`", 'e'))
-    with open('config.json', 'r') as file:
-        config.update(json.load(file))
 
 
 def embed_creator(title, message, colour=None, subject=None, author=None, anon=True, time=False):
@@ -651,13 +653,14 @@ async def close(ctx, *, reason: str = ''):
         embed_guild.add_field(name='Reason', value=reason)
     embed_guild.add_field(name='User', value=f'<@{user_id}> ({user_id})', inline=False)
     log = await bot.get_channel(config.log_channel_id).send(embed=embed_guild, files=[discord.File(f'{user_id}.txt', filename='log.txt'),
-                                                                                         discord.File(f'{user_id}.htm', filename='log.htm')])
-    if str(user_id) in logs:
-        logs[str(user_id)].append(log.id)
-    else:
-        logs[str(user_id)] = [log.id]
-    with open('logs.json', 'w') as file:
-        json.dump(logs, file)
+                                                                                      discord.File(f'{user_id}.htm', filename='log.htm')])
+
+    with sqlite3.connect('logs.db') as conn:
+        curs = conn.cursor()
+        curs.execute(f'INSERT INTO logs VALUES (?, ?, ?, ?)',
+                     (user_id, datetime.datetime.now().timestamp(), log.attachments[0].url, log.attachments[1].url))
+        conn.commit()
+
     await ctx.channel.delete()
     os.remove(f'{user_id}.txt')
     os.remove(f'{user_id}.htm')
@@ -885,36 +888,24 @@ async def search(ctx, user: discord.User, *, search_term: str = None):
 
     searching = await ctx.send(embed=embed_creator('Searching...', 'This may take up to several minutes.', 'b'))
 
-    log_channel = bot.get_channel(config.log_channel_id)
-    log_messages = logs.get(str(user.id), [])
     embeds = [embed_creator(f'Tickets for {user}', '', 'b')]
-    for message_id in log_messages:
+    with sqlite3.connect('logs.db') as conn:
+        curs = conn.cursor()
+        curs.execute(f'SELECT timestamp, txt_log_url, htm_log_url FROM logs WHERE user_id = ?', [user.id])
 
-        try:
-            message = await log_channel.fetch_message(message_id)
-        except discord.NotFound:
-            continue
-        if not message.embeds or message.embeds[0].title != 'Ticket Closed':
-            continue
+    async with aiohttp.ClientSession() as session:
+        for timestamp, txt_log_url, htm_log_url in curs.fetchall():
+            if search_term is not None:
+                async with session.get(txt_log_url) as response:
+                    text_log = await response.read()
+                    text_log = text_log.decode('utf-8')
+                    if search_term.lower() not in text_log.lower():
+                        continue
 
-        txt_log = None
-        htm_log_url = 'No log found.'
-        for attachment in message.attachments:
-            if attachment.filename.endswith('.txt'):
-                txt_log = attachment
-            elif attachment.filename.endswith('.htm'):
-                htm_log_url = attachment.url
+            if len(embeds[-1].description) > 3900:
+                embeds.append(embed_creator('', '', 'b'))
 
-        if search_term is not None and txt_log is not None:
-            txt_log = await txt_log.read()
-            txt_log = txt_log.decode('utf-8')
-            if search_term.lower() not in txt_log.lower():
-                continue
-
-        if len(embeds[-1].description) > 3900:
-            embeds.append(embed_creator('', '', 'b'))
-
-        embeds[-1].description += f'• `{message.embeds[0].timestamp.strftime("%d %b %Y")}` {htm_log_url}\n'
+            embeds[-1].description += f'• <t:{int(timestamp)}:D> {htm_log_url}\n'
 
     await searching.delete()
     for embed in embeds:
