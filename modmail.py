@@ -652,13 +652,13 @@ async def close(ctx, *, reason: str = ''):
         embed_user.add_field(name='Reason', value=reason)
         embed_guild.add_field(name='Reason', value=reason)
     embed_guild.add_field(name='User', value=f'<@{user_id}> ({user_id})', inline=False)
-    log = await bot.get_channel(config.log_channel_id).send(embed=embed_guild, files=[discord.File(f'{user_id}.txt', filename='log.txt'),
-                                                                                      discord.File(f'{user_id}.htm', filename='log.htm')])
+    log = await bot.get_channel(config.log_channel_id).send(embed=embed_guild, files=[discord.File(f'{user_id}.txt', filename=f'{bot.user.name} Log {ctx.channel.id}.txt'),
+                                                                                      discord.File(f'{user_id}.htm', filename=f'{bot.user.name} Log {ctx.channel.id}.htm')])
 
     with sqlite3.connect('logs.db') as conn:
         curs = conn.cursor()
         curs.execute(f'INSERT INTO logs VALUES (?, ?, ?, ?)',
-                     (user_id, datetime.datetime.now().timestamp(), log.attachments[0].url, log.attachments[1].url))
+                     (user_id, int(ctx.channel.created_at.timestamp()), log.attachments[0].url, log.attachments[1].url))
         conn.commit()
 
     await ctx.channel.delete()
@@ -883,10 +883,11 @@ async def remove(ctx, user_id: int):
 
 @bot.command()
 @commands.check(is_helper)
-async def search(ctx, user: discord.User, *, search_term: str = None):
+async def search(ctx, user: discord.User, *, search_term: str = ''):
     """Returns ticket logs"""
 
-    if search_term is not None:
+    if search_term:
+        search_term = search_term.lower()
         searching = await ctx.send(embed=embed_creator('Searching...', 'This may take a while.', 'b'))
     else:
         searching = None
@@ -894,15 +895,14 @@ async def search(ctx, user: discord.User, *, search_term: str = None):
     embeds = [embed_creator(f'Tickets for {user}', '', 'b')]
     with sqlite3.connect('logs.db') as conn:
         curs = conn.cursor()
-        curs.execute(f'SELECT timestamp, txt_log_url, htm_log_url FROM logs WHERE user_id = ?', [user.id])
+        curs.execute(f'SELECT timestamp, txt_log_url, htm_log_url FROM logs WHERE user_id = ?', (user.id,))
 
     async with aiohttp.ClientSession() as session:
         for timestamp, txt_log_url, htm_log_url in curs.fetchall():
-            if search_term is not None:
+            if search_term:
                 async with session.get(txt_log_url) as response:
                     text_log = await response.read()
-                    text_log = text_log.decode('utf-8')
-                    if search_term.lower() not in text_log.lower():
+                    if search_term not in text_log.decode('utf-8').lower():
                         continue
 
             if len(embeds[-1].description) > 3900:
