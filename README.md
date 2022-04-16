@@ -57,13 +57,10 @@ The !refresh command will make the script re-read the config file, so you can ch
 
 ### Dependancies
 
-#### [bleach](https://github.com/mozilla/bleach)
-This is in PyPI so is simple to install: `pip install bleach`. The latest version that has been tested is 5.0.0, 
-although future versions are very likely to carry on working.
+The required/working versions of these packages are listed in `requirements.txt`. To install them, use `pip install -r requirements.txt`.
 
-#### [discord.py](https://github.com/Rapptz/discord.py)
-Modmail requires version 2.0, which currently must be installed from github: `pip install -U git+https://github.com/Rapptz/discord.py`.
-Since this is under active development there are relatively frequent breaking changes.
+[bleach](https://github.com/mozilla/bleach)
 
-#### [aiohttp](https://github.com/aio-libs/aiohttp)
-This is installed with discord.py, so there is no need to install it yourself.
+[discord.py](https://github.com/Rapptz/discord.py)
+
+[aiohttp](https://github.com/aio-libs/aiohttp) (this is installed with discord.py)
