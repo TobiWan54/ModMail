@@ -1,0 +1,2 @@
+bleach==5.0.0
+git+https://github.com/Rapptz/discord.py@6265723
