@@ -36,7 +36,7 @@ class HelpCommand(commands.DefaultHelpCommand):
     def __init__(self):
         super().__init__(command_attrs={'checks': [is_helper]})
         self.no_category = 'Commands'
-        self.add_check(is_helper)
+        self.width = 100
 
     def get_ending_note(self) -> str:
         return f'Type {config.prefix}help command for more info on a command.'
@@ -380,7 +380,7 @@ async def reply(ctx, *, message: str = ''):
 @bot.command()
 @commands.check(is_helper)
 async def send(ctx, user: discord.User, *, message: str = ''):
-    """Messages a user that does not have a ticket open"""
+    """Creates a ticket for a user and sends them an anonymous message"""
 
     if user == bot.user:
         await ctx.send(embed=embed_creator('', 'I cannot DM myself!', 'e'))
@@ -447,7 +447,7 @@ async def send(ctx, user: discord.User, *, message: str = ''):
 @bot.command()
 @commands.check(is_helper)
 async def close(ctx, *, reason: str = ''):
-    """Anonymously closes a ticket"""
+    """Anonymously closes and logs a ticket"""
 
     if not is_modmail_channel(ctx):
         await ctx.send(embed=embed_creator('', 'This channel is not a valid ticket.', 'e'))
@@ -674,7 +674,7 @@ async def close(ctx, *, reason: str = ''):
 @bot.group(invoke_without_command=True, aliases=['snippets'])
 @commands.check(is_helper)
 async def snippet(ctx, name: str):
-    """Sends a snippet. Use sub-commands to manage"""
+    """Anonymously sends a snippet. Use sub-commands (!help snippet) to manage"""
 
     if not is_modmail_channel(ctx):
         await ctx.send(embed=embed_creator('', 'This channel is not a ticket.', 'e'))
@@ -713,7 +713,7 @@ async def snippet(ctx, name: str):
 
 @snippet.command()
 async def view(ctx, name: str = ''):
-    """Shows a named snippet, or all snippets if no name is given."""
+    """Shows a named snippet, or all snippets if no name is given"""
 
     if name:
         name = name.lower()
@@ -798,7 +798,7 @@ async def remove(ctx, name: str):
 @bot.group(invoke_without_command=True)
 @commands.check(is_mod)
 async def blacklist(ctx):
-    """Use sub-commands to manage"""
+    """Use sub-commands (!help blacklist) to manage"""
     await ctx.send(embed=embed_creator('', 'Please specify `view`, `check`, `add` or `remove` as an additional argument.', 'e'))
 
 
@@ -884,7 +884,7 @@ async def remove(ctx, user_id: int):
 @bot.command()
 @commands.check(is_helper)
 async def search(ctx, user: discord.User, *, search_term: str = ''):
-    """Returns ticket logs"""
+    """Displays a user's previous tickets, or only those containing a search term"""
 
     if search_term:
         search_term = search_term.lower()
@@ -925,7 +925,7 @@ async def ping(ctx):
 @bot.command()
 @commands.check(is_helper)
 async def refresh(ctx):
-    """May fix some ticket-related issues"""
+    """Re-reads the external config file, and may fix some ticket-related issues"""
 
     with open('config.json', 'r') as file:
         config.update(json.load(file))
