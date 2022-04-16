@@ -562,7 +562,7 @@ async def close(ctx, *, reason: str = ''):
     li.comment h2 { color:#6C757D; }
     span.datetime { color:#8898AA; font-weight:normal; }
     p { margin:5px; padding:0; }
-    ul { margin-bottom: 5px; padding:0; list-style-type:none; }
+    ul { margin-bottom: 50px; padding:0; list-style-type:none; }
     li { margin:5px; padding:15px; list-style-type:none; background:#222529; border-radius:5px; }
     img { max-width:100%; }
     video { max-width:100%; }
@@ -581,7 +581,7 @@ async def close(ctx, *, reason: str = ''):
                     name = html_sanitiser.clean(message.embeds[0].footer.text)
                 elif message.embeds[0].title == 'Message Sent':
                     htm_class = 'staff'
-                    name = html_sanitiser.clean(message.embeds[0].author.name.strip(' (Anonymous)'))
+                    name = html_sanitiser.clean(message.embeds[0].author.name.removesuffix(' (Anonymous)'))
                 else:
                     continue
                 if message.embeds[0].description is None:
