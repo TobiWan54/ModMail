@@ -271,9 +271,7 @@ async def on_message(message):
             await message.channel.send(embed=embed_creator('Ticket Created', config.open_message, 'b', guild))
 
     # Message from mod to user.
-    else:
-        if not is_modmail_channel(message) or (len(message.content) > 0 and message.content[0] == config.prefix):
-            return
+    elif is_modmail_channel(message) and not (len(message.content) > 0 and message.content.startswith(config.prefix)):
 
         user_id = message.channel.topic.split()[0]
         try:
