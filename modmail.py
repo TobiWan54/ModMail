@@ -208,6 +208,9 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    if not message.content and len(message.stickers) >= 1:
+        return
+
     await bot.process_commands(message)
 
     # Message from user to mod.
