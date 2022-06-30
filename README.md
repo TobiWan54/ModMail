@@ -31,11 +31,11 @@ and host the script yourself. Oracle Cloud and Google Cloud both have free tiers
 The script requires Python 3.10 or higher and the packages listed under Dependancies.
 
 ### Configuration
-Fill out the `config.json` file in [templates](https://github.com/TobiWan54/ModMail/tree/main/templates) and put it in the same 
-directory as `modmail.py`. Then add the other `.json` files - there is no need to change these.
-When that's all done you can run the script, and your bot will be online!
+Fill out [config.json](https://github.com/TobiWan54/ModMail/tree/main/templates/config.json) with your own values, and put it in the same 
+directory as `modmail.py`. Then run the script, and your bot will be online!
 
-Ticket logs are indexed in an SQLite database, `logs.db`. This is automatically created by the script, so do not delete it.
+Snippets are stored in `snippets.json`, and the blacklist is stored in `blacklist.json`. Ticket logs are indexed in an SQLite database, `logs.db`.
+These are automatically created by the script, so do not delete them.
 
 #### config.json
 
