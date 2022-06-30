@@ -63,11 +63,21 @@ class Config:
 with open('config.json', 'r') as config_file:
     config = Config(**json.load(config_file))
 
-with open('snippets.json', 'r') as snippets_file:
-    snippets = json.load(snippets_file)
+try:
+    with open('snippets.json', 'r') as snippets_file:
+        snippets = json.load(snippets_file)
+except FileNotFoundError:
+    snippets = {}
+    with open('snippets.json', 'w') as snippets_file:
+        json.dump(snippets, snippets_file)
 
-with open('blacklist.json', 'r') as blacklist_file:
-    blacklist_list = json.load(blacklist_file)
+try:
+    with open('blacklist.json', 'r') as blacklist_file:
+        blacklist_list = json.load(blacklist_file)
+except FileNotFoundError:
+    blacklist = []
+    with open('blacklist.json', 'w') as blacklist_file:
+        json.dump(blacklist, blacklist_file)
 
 with sqlite3.connect('logs.db') as connection:
     cursor = connection.cursor()
@@ -957,7 +967,7 @@ async def eval(ctx, *, body: str):
     try:
         with contextlib.redirect_stdout(stdout):
             ret = await func()
-    except Exception as e:
+    except:
         value = stdout.getvalue()
         try:
             await ctx.send(f'```py\n{value}{traceback.format_exc()}\n```')
