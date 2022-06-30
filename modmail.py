@@ -977,4 +977,4 @@ async def eval(ctx, *, body: str):
             await ctx.send(f'```py\n{value}{ret}\n```')
 
 
-bot.run(config.token)
+bot.run(config.token, log_handler=None)
