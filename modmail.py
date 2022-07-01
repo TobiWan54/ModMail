@@ -237,9 +237,16 @@ async def on_message(message):
         if ticket_id is None:
             ticket_create = True
             tickets[message.author.id] = 0
-            channel = await guild.create_text_channel(f'{message.author.name} {message.author.discriminator}',
-                                                      category=bot.get_channel(config.category_id),
-                                                      topic=f'{message.author.id} (User ID, do not change)')
+            try:
+                channel = await guild.create_text_channel(f'{message.author.name} {message.author.discriminator}',
+                                                          category=bot.get_channel(config.category_id),
+                                                          topic=f'{message.author.id} (User ID, do not change)')
+            except discord.HTTPException as e:
+                if 'Contains words not allowed for servers in Server Discovery' in e.text:
+                    channel = await guild.create_text_channel('ticket', category=bot.get_channel(config.category_id),
+                                                              topic=f'{message.author.id} (User ID, do not change)')
+                else:
+                    raise e from None
             await bot.get_channel(config.log_channel_id).send(embed=embed_creator('New Ticket', '', 'g', message.author))
             embed = embed_creator('New Ticket',
                                   f'Replies are anonymous by default, and messages starting with `{config.prefix}` are ignored (although using the discussion thread is preferable). Use `{config.prefix}reply` to send a non-anonymous reply. Use `{config.prefix}close` to close anonymously.',
