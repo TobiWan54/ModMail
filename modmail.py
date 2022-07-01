@@ -149,6 +149,7 @@ bot = commands.Bot(command_prefix=config.prefix, intents=discord.Intents.all(), 
 
 @bot.event
 async def on_ready():
+    await bot.wait_until_ready()
     print(f'{bot.user.name} has connected to Discord!')
     await load_tickets()
 
