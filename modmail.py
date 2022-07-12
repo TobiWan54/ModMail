@@ -610,7 +610,10 @@ async def close(ctx, *, reason: str = ''):
                 for i in range(len(message.embeds[0].fields)):
                     value = message.embeds[0].fields[i].value
                     mimetype = mimetypes.guess_type(value)[0]
-                    filetype = mimetype.split('/', 1)[0]
+                    if mimetype is not None:
+                        filetype = mimetype.split('/', 1)[0]
+                    else:
+                        filetype = None
                     if i > 0 or content != '':
                         content += '<br></br>'
                     if filetype == 'image':
