@@ -243,6 +243,7 @@ async def on_message(message):
                                                           category=bot.get_channel(config.category_id),
                                                           topic=f'{message.author.id} (User ID, do not change)')
             except discord.HTTPException as e:
+                del tickets[message.author.id]
                 if 'Contains words not allowed for servers in Server Discovery' in e.text:
                     channel = await guild.create_text_channel('ticket', category=bot.get_channel(config.category_id),
                                                               topic=f'{message.author.id} (User ID, do not change)')
