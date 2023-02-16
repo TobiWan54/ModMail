@@ -93,6 +93,7 @@ tickets = {}
 
 async def load_tickets():
     category = bot.get_channel(config.category_id)
+    tickets.clear()
     for channel in category.text_channels:
         if channel.topic is not None:
             try:
