@@ -54,6 +54,7 @@ class Config:
     prefix: str
     open_message: str
     close_message: str
+    anonymous_tickets: bool
 
     def update(self, new: dict):
         for key, value in new.items():
@@ -78,6 +79,14 @@ except FileNotFoundError:
     blacklist = []
     with open('blacklist.json', 'w') as blacklist_file:
         json.dump(blacklist, blacklist_file)
+
+try:
+    with open('counter.txt', 'r') as counter_file:
+        counter = int(counter_file.read())
+except FileNotFoundError:
+    with open('counter.txt', 'r') as counter_file:
+        counter_file.write('0')
+        counter = 0
 
 with sqlite3.connect('logs.db') as connection:
     cursor = connection.cursor()
@@ -240,8 +249,15 @@ async def on_message(message):
             ticket_create = True
             tickets[message.author.id] = 0
             try:
-                channel = await guild.create_text_channel(f'{message.author.name} {message.author.discriminator}',
-                                                          category=bot.get_channel(config.category_id),
+                if config.anonymous_tickets:
+                    global counter
+                    ticket_name = f'ticket {str(counter).rjust(4, "0")}'
+                    counter += 1
+                    if counter == 10000:
+                        counter = 0
+                else:
+                    ticket_name = f'{message.author.name} {message.author.discriminator}'
+                channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id),
                                                           topic=f'{message.author.id} (User ID, do not change)')
             except discord.HTTPException as e:
                 del tickets[message.author.id]
