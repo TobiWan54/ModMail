@@ -9,5 +9,5 @@
   "prefix": "prefix",
   "open_message": "open_message",
   "close_message": "close_message",
-  "anonomyous_tickets": "no"
+  "anonomyous_tickets": false
 }
