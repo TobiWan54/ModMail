@@ -84,7 +84,7 @@ try:
     with open('counter.txt', 'r') as counter_file:
         counter = int(counter_file.read())
 except FileNotFoundError:
-    with open('counter.txt', 'r') as counter_file:
+    with open('counter.txt', 'w') as counter_file:
         counter_file.write('0')
         counter = 0
 
