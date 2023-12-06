@@ -258,7 +258,7 @@ async def on_message(message):
                     with open('counter.txt', 'w') as file:
                         file.write(str(counter))
                 else:
-                    ticket_name = f'{message.author.name} {message.author.discriminator}'
+                    ticket_name = f'{message.author.name}'
                 channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id),
                                                           topic=f'{message.author.id} (User ID, do not change)')
             except discord.HTTPException as e:
@@ -280,7 +280,7 @@ async def on_message(message):
                 duration = 4320
             else:
                 duration = 1440
-            await header.create_thread(name=f'Discussion for {message.author.name} {message.author.discriminator}',
+            await header.create_thread(name=f'Discussion for {message.author.name}',
                                        auto_archive_duration=duration)
             tickets[message.author.id] = channel.id
         else:
@@ -455,7 +455,7 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     for index, attachment in enumerate(user_message.attachments):
         channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
 
-    channel = await ctx.guild.create_text_channel(f'{user.name} {user.discriminator}',
+    channel = await ctx.guild.create_text_channel(f'{user.name}',
                                                   category=bot.get_channel(config.category_id),
                                                   topic=f'{user.id} (User ID, do not change)')
     tickets[user.id] = channel.id
@@ -473,7 +473,7 @@ async def send(ctx, user: discord.User, *, message: str = ''):
         duration = 4320
     else:
         duration = 1440
-    await header.create_thread(name=f'Discussion for {user.name} {user.discriminator}', auto_archive_duration=duration)
+    await header.create_thread(name=f'Discussion for {user.name}', auto_archive_duration=duration)
 
     files_to_send = []
     for file in files:
