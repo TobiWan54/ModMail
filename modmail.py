@@ -255,6 +255,8 @@ async def on_message(message):
                     counter += 1
                     if counter == 10000:
                         counter = 0
+                    with open('counter.txt', 'w') as file:
+                        file.write(str(counter))
                 else:
                     ticket_name = f'{message.author.name} {message.author.discriminator}'
                 channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id),
