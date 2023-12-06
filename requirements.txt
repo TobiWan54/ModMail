@@ -1,2 +1,2 @@
 bleach==5.0.0
-https://github.com/Rapptz/discord.py@3b5cd3b
+discord.py==2.3.2
