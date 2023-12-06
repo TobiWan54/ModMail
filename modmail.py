@@ -186,6 +186,13 @@ async def error_handler(error, message=None):
             pass
         return
 
+    if isinstance(error, discord.HTTPException) and 'Maximum number of channels in category reached' in error.text:
+        try:
+            await message.channel.send(embed=embed_creator('Failed to Send', f'Sorry, {bot.user.name}\'s inbox is currently full. Please try again later or DM a mod if your problem is urgent.', 'e', bot.get_guild(config.guild_id)))
+            return
+        except:
+            pass
+
     try:
         await message.channel.send(embed=embed_creator(error.__class__.__name__, str(error), 'e'))
     except:
