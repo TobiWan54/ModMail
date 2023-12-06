@@ -1,4 +1,5 @@
 *.json
 *.db
 prod.py
+counter.txt
 .idea/
