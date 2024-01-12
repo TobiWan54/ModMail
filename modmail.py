@@ -56,6 +56,7 @@ class Config:
     open_message: str
     close_message: str
     anonymous_tickets: bool
+    prefix_to_send: bool
 
     def update(self, new: dict):
         for key, value in new.items():
@@ -324,7 +325,17 @@ async def on_message(message):
             await message.channel.send(embed=embed_creator('Ticket Created', config.open_message, 'b', guild))
 
     # Message from mod to user.
-    elif is_modmail_channel(message) and not (len(message.content) > 0 and message.content.startswith(config.prefix)):
+    elif is_modmail_channel(message):
+
+        message_content = message.content
+        if config.prefix_to_send:
+            if len(message_content) > 0 and message_content.startswith(f'{config.prefix} '):
+                message_content = message_content.removeprefix(f'{config.prefix} ')
+            else:
+                return
+        else:
+            if len(message_content) > 0 and message_content.startswith(config.prefix):
+                return
 
         user_id = message.channel.topic.split()[0]
         try:
@@ -346,8 +357,8 @@ async def on_message(message):
                 await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
             return
 
-        channel_embed = embed_creator('Message Sent', message.content, 'r', user, message.author)
-        user_embed = embed_creator('Message Received', message.content, 'r', message.guild)
+        channel_embed = embed_creator('Message Sent', message_content, 'r', user, message.author)
+        user_embed = embed_creator('Message Received', message_content, 'r', message.guild)
         files = []
         files_to_send = []
         for attachment in message.attachments:
