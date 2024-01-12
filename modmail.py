@@ -48,6 +48,7 @@ class Config:
     guild_id: int
     category_id: int
     log_channel_id: int
+    error_channel_id: int
     helper_role_id: int
     mod_role_id: int
     bot_owner_id: int
@@ -187,11 +188,14 @@ async def error_handler(error, message=None):
         return
 
     if isinstance(error, discord.HTTPException) and 'Maximum number of channels in category reached' in error.text:
+        await bot.get_channel(config.error_channel_id).send(embed=embed_creator('Inbox Full', f'<@{message.author.id}> ({message.author.id}) tried to open a ticket but the maximum number of channels per category (50) has been reached.',
+                                                                                'e', author=message.author))
         try:
-            await message.channel.send(embed=embed_creator('Failed to Send', f'Sorry, {bot.user.name}\'s inbox is currently full. Please try again later or DM a mod if your problem is urgent.', 'e', bot.get_guild(config.guild_id)))
-            return
+            await message.channel.send(embed=embed_creator('Inbox Full', f'Sorry, {bot.user.name} is currently full. Please try again later or DM a mod if your problem is urgent.',
+                                                           'e', bot.get_guild(config.guild_id)))
         except:
             pass
+        return
 
     try:
         await message.channel.send(embed=embed_creator(error.__class__.__name__, str(error), 'e'))
@@ -212,9 +216,13 @@ async def error_handler(error, message=None):
     if len(tb) > 2000:
         with open('error.txt', 'w') as tb_file:
             tb_file.write(tb)
-        await bot.get_user(config.bot_owner_id).send(file=discord.File(io.BytesIO(tb.encode('utf-8')), filename='error.txt'), embed=embed)
+        await bot.get_user(config.bot_owner_id).send(
+            file=discord.File(io.BytesIO(tb.encode('utf-8')), filename='error.txt'), embed=embed)
+        await bot.get_channel(config.error_channel_id).send(
+            file=discord.File(io.BytesIO(tb.encode('utf-8')), filename='error.txt'), embed=embed)
     else:
         await bot.get_user(config.bot_owner_id).send(f'```py\n{tb}```', embed=embed)
+        await bot.get_channel(config.error_channel_id).send(f'```py\n{tb}```', embed=embed)
 
 
 @bot.event
