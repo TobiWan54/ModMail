@@ -56,7 +56,7 @@ class Config:
     open_message: str
     close_message: str
     anonymous_tickets: bool
-    prefix_to_send: bool
+    send_with_command_only: bool
 
     def update(self, new: dict):
         for key, value in new.items():
@@ -226,6 +226,60 @@ async def error_handler(error, message=None):
         await bot.get_channel(config.error_channel_id).send(f'```py\n{tb}```', embed=embed)
 
 
+async def send_message(message, text, anon):
+    user_id = message.channel.topic.split()[0]
+    try:
+        user_id = int(user_id)
+    except ValueError:
+        await message.channel.send(
+            embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config.prefix}refresh`",
+                                'e'))
+        return
+    user = bot.get_user(user_id)
+    if user is not None:
+        if message.guild not in user.mutual_guilds:
+            await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
+            return
+    else:
+        try:
+            await bot.fetch_user(user_id)
+        except discord.NotFound:
+            await message.channel.send(
+                embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config.prefix}refresh`. Otherwise, the user have may deleted their account.",
+                                    'e'))
+        else:
+            await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
+        return
+
+    channel_embed = embed_creator('Message Sent', text, 'r', user, message.author, anon=anon)
+    user_embed = embed_creator('Message Received', text, 'r', message.guild, message.author, anon=anon)
+    files = []
+    files_to_send = []
+    for attachment in message.attachments:
+        if attachment.size > 8000000:
+            await message.channel.send(
+                embed=embed_creator('Failed to Send', 'One or more attachments are larger than 8 MB.', 'e'))
+            return
+        file = io.BytesIO(await attachment.read())
+        file.seek(0)
+        files.append((file, attachment.filename))
+        files_to_send.append(discord.File(file, attachment.filename))
+    try:
+        user_message = await user.send(embed=user_embed, files=files_to_send)
+    except discord.Forbidden:
+        await message.channel.send(
+            embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
+        return
+    for index, attachment in enumerate(user_message.attachments):
+        channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
+    await message.delete()
+    # Must be rebuilt because a discord.File object can only be used once.
+    files_to_send = []
+    for file in files:
+        file[0].seek(0)
+        files_to_send.append(discord.File(file[0], file[1]))
+    await message.channel.send(embed=channel_embed, files=files_to_send)
+
 @bot.event
 async def on_error(event, *args, **kwargs):
     if event == 'on_message':
@@ -325,121 +379,38 @@ async def on_message(message):
             await message.channel.send(embed=embed_creator('Ticket Created', config.open_message, 'b', guild))
 
     # Message from mod to user.
-    elif is_modmail_channel(message):
+    else:
 
-        message_content = message.content
-        if config.prefix_to_send:
-            if len(message_content) > 0 and message_content.startswith(f'{config.prefix} '):
-                message_content = message_content.removeprefix(f'{config.prefix} ')
-            else:
-                return
-        else:
-            if len(message_content) > 0 and message_content.startswith(config.prefix):
-                return
-
-        user_id = message.channel.topic.split()[0]
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            await message.channel.send(embed=embed_creator('Failed to Send', f"User ID retrieved from channel topic as `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config.prefix}refresh`", 'e'))
+        if not is_modmail_channel(message):
             return
-        user = bot.get_user(user_id)
-        if user is not None:
-            if message.guild not in user.mutual_guilds:
-                await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-                return
-        else:
-            try:
-                await bot.fetch_user(user_id)
-            except discord.NotFound:
-                await message.channel.send(embed=embed_creator('Failed to Send', f"User with ID retrieved from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config.prefix}refresh`. Otherwise, the user may have deleted their account.", 'e'))
-            else:
-                await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
+        elif config.send_with_command_only:
+            return
+        elif len(message.content) > 0 and message.content.startswith(config.prefix):
             return
 
-        channel_embed = embed_creator('Message Sent', message_content, 'r', user, message.author)
-        user_embed = embed_creator('Message Received', message_content, 'r', message.guild)
-        files = []
-        files_to_send = []
-        for attachment in message.attachments:
-            if attachment.size > 8000000:
-                await message.channel.send(embed=embed_creator('Failed to Send', 'One or more attachments are larger than 8 MB.', 'e'))
-                return
-            file = io.BytesIO(await attachment.read())
-            file.seek(0)
-            files.append((file, attachment.filename))
-            files_to_send.append(discord.File(file, attachment.filename))
-        try:
-            user_message = await user.send(embed=user_embed, files=files_to_send)
-        except discord.Forbidden:
-            await message.channel.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
-            return
-        for index, attachment in enumerate(user_message.attachments):
-            channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
-        await message.delete()
-        # Must be rebuilt because a discord.File object can only be used once.
-        files_to_send = []
-        for file in files:
-            file[0].seek(0)
-            files_to_send.append(discord.File(file[0], file[1]))
-        await message.channel.send(embed=channel_embed, files=files_to_send)
+        await send_message(message, message.content, True)
 
 
 @bot.command()
 @commands.check(is_helper)
-async def reply(ctx, *, message: str = ''):
+async def reply(ctx, *, text: str = ''):
     """Sends a non-anonymous message"""
 
-    if not is_modmail_channel(ctx):
-        await ctx.send(embed=embed_creator('', 'This channel is not a ticket.', 'e'))
-        return
-
-    user_id = ctx.channel.topic.split()[0]
-    try:
-        user_id = int(user_id)
-    except ValueError:
-        await ctx.send(embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config.prefix}refresh`", 'e'))
-        return
-    user = bot.get_user(user_id)
-    if user is not None:
-        if ctx.guild not in user.mutual_guilds:
-            await ctx.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-            return
+    if is_modmail_channel(ctx):
+        await send_message(ctx.message, text, False)
     else:
-        try:
-            await bot.fetch_user(user_id)
-        except discord.NotFound:
-            await ctx.channel.send(embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config.prefix}refresh`. Otherwise, the user have may deleted their account.", 'e'))
-        else:
-            await ctx.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-        return
+        await ctx.send(embed=embed_creator('', 'This channel is not a ticket.', 'e'))
 
-    channel_embed = embed_creator('Message Sent', message, 'r', user, ctx.author, anon=False)
-    user_embed = embed_creator('Message Received', message, 'r', ctx.guild, ctx.author, anon=False)
-    files = []
-    files_to_send = []
-    for attachment in ctx.message.attachments:
-        if attachment.size > 8000000:
-            await ctx.send(embed=embed_creator('Failed to Send', 'One or more attachments are larger than 8 MB.', 'e'))
-            return
-        file = io.BytesIO(await attachment.read())
-        file.seek(0)
-        files.append((file, attachment.filename))
-        files_to_send.append(discord.File(file, attachment.filename))
-    try:
-        user_message = await user.send(embed=user_embed, files=files_to_send)
-    except discord.Forbidden:
-        await ctx.send(embed=embed_creator('Failed to Send', f'User has server DMs disabled or has blocked {bot.user.name}.', 'e'))
-        return
-    for index, attachment in enumerate(user_message.attachments):
-        channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
-    await ctx.message.delete()
-    # Must be rebuilt because a discord.File object can only be used once.
-    files_to_send = []
-    for file in files:
-        file[0].seek(0)
-        files_to_send.append(discord.File(file[0], file[1]))
-    await ctx.send(embed=channel_embed, files=files_to_send)
+
+@bot.command()
+@commands.check(is_helper)
+async def areply(ctx, *, text: str = ''):
+    """Sends an anonymous message"""
+
+    if is_modmail_channel(ctx):
+        await send_message(ctx.message, text, True)
+    else:
+        await ctx.send(embed=embed_creator('', 'This channel is not a ticket.', 'e'))
 
 
 @bot.command()
