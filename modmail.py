@@ -251,8 +251,13 @@ async def send_message(message, text, anon):
             await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
         return
 
-    channel_embed = embed_creator('Message Sent', text, 'r', user, message.author, anon=anon)
-    user_embed = embed_creator('Message Received', text, 'r', message.guild, message.author, anon=anon)
+    print(anon)
+
+    channel_embed = embed_creator('Message Sent', text, 'r', user, message.author, anon)
+    if anon:
+        user_embed = embed_creator('Message Received', text, 'r', message.guild)
+    else:
+        user_embed = embed_creator('Message Received', text, 'r', message.guild, message.author, False)
     files = []
     files_to_send = []
     for attachment in message.attachments:
