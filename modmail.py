@@ -355,8 +355,7 @@ async def on_message(message):
                 duration = 4320
             else:
                 duration = 1440
-            await header.create_thread(name=f'Discussion for {message.author.name}',
-                                       auto_archive_duration=duration)
+            await header.create_thread(name=f'Discussion for {message.author.name}', auto_archive_duration=duration)
             tickets[message.author.id] = channel.id
         else:
             channel = bot.get_channel(ticket_id)
@@ -457,8 +456,18 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     for index, attachment in enumerate(user_message.attachments):
         channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
 
-    channel = await ctx.guild.create_text_channel(f'{user.name}',
-                                                  category=bot.get_channel(config.category_id),
+    if config.anonymous_tickets:
+        global counter
+        ticket_name = f'ticket {str(counter).rjust(4, "0")}'
+        counter += 1
+        if counter == 10000:
+            counter = 0
+        with open('counter.txt', 'w') as file:
+            file.write(str(counter))
+    else:
+        ticket_name = f'{user.name}'
+
+    channel = await ctx.guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id),
                                                   topic=f'{user.id} (User ID, do not change)')
     tickets[user.id] = channel.id
     await bot.get_channel(config.log_channel_id).send(embed=embed_creator('Ticket Created', '', 'r', user, ctx.author, anon=False))
