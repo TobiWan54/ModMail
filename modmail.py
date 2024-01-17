@@ -344,9 +344,7 @@ async def on_message(message):
                 else:
                     raise e from None
             await bot.get_channel(config.log_channel_id).send(embed=embed_creator('New Ticket', '', 'g', message.author))
-            embed = embed_creator('New Ticket',
-                                  f'Replies are anonymous by default, and messages starting with `{config.prefix}` are ignored (although using the discussion thread is preferable). Use `{config.prefix}reply` to send a non-anonymous reply. Use `{config.prefix}close` to close anonymously.',
-                                  'b', message.author, time=True)
+            embed = embed_creator('New Ticket', '', 'b', message.author, time=True)
             embed.add_field(name='User', value=f'{message.author.mention} ({message.author.id})')
             header = await channel.send(embed=embed)
             if 'SEVEN_DAY_THREAD_ARCHIVE' in guild.features:
@@ -472,9 +470,7 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     tickets[user.id] = channel.id
     await bot.get_channel(config.log_channel_id).send(embed=embed_creator('Ticket Created', '', 'r', user, ctx.author, anon=False))
 
-    embed = embed_creator('Ticket Created by Moderator',
-                          f'Replies are anonymous by default, and messages starting with `{config.prefix}` are ignored (although using the discussion thread is preferable). Use `{config.prefix}reply` to send a non-anonymous reply. Use `{config.prefix}close` to close anonymously.',
-                          'b', user, time=True)
+    embed = embed_creator('Ticket Created by Moderator', '', 'b', user, time=True)
     embed.add_field(name='User', value=f'{user.mention} ({user.id})')
     header = await channel.send(embed=embed)
 
