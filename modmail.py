@@ -366,16 +366,26 @@ async def on_message(message):
         ticket_embed = embed_creator('Message Received', message.content, 'g', message.author)
         user_embed = embed_creator('Message Sent', message.content, 'g', guild)
         files = []
+        total_filesize = 0
+        attachment_embeds = []
         n = 0
         if message.attachments:
-            await confirmation_message.edit(embed=embed_creator('Sending Message...', 'This may take a few minutes.', 'g', guild))
+            await confirmation_message.edit(embed=embed_creator('Sending Message...', 'This may take a few minutes.',
+                                                                'g', guild))
             for attachment in message.attachments:
-                if attachment.size <= guild.filesize_limit:
-                    files.append(await attachment.to_file())
                 n += 1
+                total_filesize += attachment.size
+                if attachment.size < guild.filesize_limit:
+                    files.append(await attachment.to_file())
+                    attachment_embeds.append(embed_creator(f'Attachment {n}', '', 'g', message.author))
                 ticket_embed.add_field(name=f'Attachment {n}', value=attachment.url, inline=False)
             user_embed.add_field(name='Attachment(s) Sent Successfully', value=len(message.attachments))
-        await channel.send(embed=ticket_embed, files=files)
+        if total_filesize < guild.filesize_limit and len(files) <= 10:
+            await channel.send(embed=ticket_embed, files=files)
+        else:
+            await channel.send(embed=ticket_embed)
+            for i in range(len(files)):
+                await channel.send(embed=attachment_embeds[i], file=files[i])
         await confirmation_message.edit(embed=user_embed)
         if ticket_create:
             await message.channel.send(embed=embed_creator('Ticket Created', config.open_message, 'b', guild))
@@ -437,8 +447,9 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     files = []
     files_to_send = []
     for attachment in ctx.message.attachments:
-        if attachment.size > 8000000:
-            await ctx.send(embed=embed_creator('Failed to Send', 'One or more attachments are larger than 8 MB.', 'e'))
+        if attachment.size >= ctx.filesize_limit:
+            await ctx.send(embed=embed_creator('Failed to Send', f'One or more attachments are larger than {ctx.filesize_limit/1024/1024} MB.',
+                                               'e'))
             return
         file = io.BytesIO(await attachment.read())
         file.seek(0)
