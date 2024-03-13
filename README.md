@@ -45,8 +45,10 @@ Along with `counter.txt` these are automatically created by the script, so do no
 - `category_id` is the ID of the category that tickets to be created in. You will have to create this yourself.
 - `log_channel_id` is the ID of the channel that ticket logs will be sent in.
 You will have to create this yourself. If it is the tickets category, make sure that it has no topic, or it will break the bot.
+- `attachment_log_channel_id` is the ID of the channel that attachments will be logged in. It can be the same as log_channel_id above.
+Set to 0 to enable legacy logging, which makes attachments only viewable for up to 24 hours but tickets close much faster.
 - `error_channel_id` is the ID of the channel that you want error messages to be sent in.
-This can be the log channel if you want, just set it to the same as above.
+This can also be the log channel if you want.
 - `helper_role_id` is the ID of your server's helper or trainee role, which can use everything except the blacklist.
 If you do not have a helper role, set this to the same value as mod_role_id below.
 - `mod_role_id` is the ID of your server's moderator role, which can use everything.
