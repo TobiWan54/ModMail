@@ -8,6 +8,7 @@ import io
 import contextlib
 import traceback
 import json
+import mimetypes
 import sys
 import functools
 import dataclasses
@@ -570,9 +571,12 @@ async def close(ctx, *, reason: str = ''):
             except IndexError:
                 thread_messages = []
 
-    with open(f'{user_id}.htm', 'w') as htm_log, open(f'{user_id}.txt', 'w') as txt_log:
-        htm_log.write(
-            '''
+    if config.attachment_log_channel_id != 0:
+        # Logging v2
+
+        with open(f'{user_id}.htm', 'w') as htm_log, open(f'{user_id}.txt', 'w') as txt_log:
+            htm_log.write(
+                '''
 <!doctype html>
 <html lang="en">
 <head>
@@ -602,104 +606,249 @@ async def close(ctx, *, reason: str = ''):
 <h1>'''+bot.user.name+'''</h1>
 <main>        
     <ul>
-            '''
-        )
-        for message in channel_messages:
-            if len(message.embeds) == 1:
-                if message.embeds[0].description is None:
-                    htm_content = ''
-                    txt_content = ''
-                else:
-                    htm_content = html_linkifier.clean(message.embeds[0].description)
-                    txt_content = message.embeds[0].description
-                if message.embeds[0].title == 'Message Received':
-                    htm_class = 'user'
-                    htm_name = html_sanitiser.clean(message.embeds[0].footer.text)
-                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.embeds[0].footer.text} '
-                                  f'(User): {txt_content}')
-                elif message.embeds[0].title == 'Message Sent':
-                    htm_class = 'staff'
-                    htm_name = html_sanitiser.clean(message.embeds[0].author.name.removesuffix(' (Anonymous)'))
-                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] '
-                                  f'{message.embeds[0].author.name.strip(" (Anonymous)")} (Mod): {txt_content}')
-                else:
-                    continue
-            else:
-                htm_class = 'comment'
-                htm_name = html_sanitiser.clean(message.author.name)
-                htm_content = html_sanitiser.clean(message.content)
-                txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name} (Comment): '
-                              f'{message.content}')
-            for i in range(len(message.attachments)):
-                attachment = message.attachments[i]
-                if attachment.content_type:
-                    filetype = attachment.content_type.split('/', 1)[0].capitalize()
-                else:
-                    filetype = None
-                if i > 0 or htm_content != '':
-                    htm_content += '<br></br>'
-                if attachment.size >= ctx.guild.filesize_limit:
-                    if filetype == 'Image':
-                        htm_content += f'<img src="{attachment}" alt="{attachment.filename} too large to be logged ({math.ceil(attachment.size/1048576)} MB)">'
-                    elif filetype == 'Video':
-                        htm_content += f'<video src="{attachment}" alt="{attachment.filename} too large to be logged ({math.ceil(attachment.size/1048576)} MB)">'
+                '''
+            )
+            for message in channel_messages:
+                if len(message.embeds) == 1:
+                    if message.embeds[0].description is None:
+                        htm_content = ''
+                        txt_content = ''
                     else:
-                        htm_content += f'<a href="{attachment}">{attachment.filename} ({math.ceil(attachment.size/1048576)} MB)</a>'
-                    txt_log.write(f'\n{attachment.filename} ({math.ceil(attachment.size/1048576)} MB)')
+                        htm_content = html_linkifier.clean(message.embeds[0].description)
+                        txt_content = message.embeds[0].description
+                    if message.embeds[0].title == 'Message Received':
+                        htm_class = 'user'
+                        htm_name = html_sanitiser.clean(message.embeds[0].footer.text)
+                        txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.embeds[0].footer.text} '
+                                      f'(User): {txt_content}')
+                    elif message.embeds[0].title == 'Message Sent':
+                        htm_class = 'staff'
+                        htm_name = html_sanitiser.clean(message.embeds[0].author.name.removesuffix(' (Anonymous)'))
+                        txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] '
+                                      f'{message.embeds[0].author.name.strip(" (Anonymous)")} (Mod): {txt_content}')
+                    else:
+                        continue
                 else:
-                    if not closing_message_edited:
-                        await closing_message.edit(embed=embed_creator('Closing Ticket...', 'This may take a while.', 'b'))
-                        closing_message_edited = True
-                    file = await attachment.to_file()
-                    file_log = await bot.get_channel(config.attachment_log_channel_id).send(
-                        content=f'{user} ({user_id}) {message.created_at.strftime("%y-%m-%d %H:%M")}', file=file)
-                    htm_content += f'<a href="{file_log.jump_url}">{attachment.filename}</a>'
-                    txt_log.write(f'\n{file_log.jump_url} ({filetype})')
+                    htm_class = 'comment'
+                    htm_name = html_sanitiser.clean(message.author.name)
+                    htm_content = html_sanitiser.clean(message.content)
+                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name} (Comment): '
+                                  f'{message.content}')
+                for i in range(len(message.attachments)):
+                    attachment = message.attachments[i]
+                    if attachment.content_type:
+                        filetype = attachment.content_type.split('/', 1)[0].capitalize()
+                    else:
+                        filetype = None
+                    if i > 0 or htm_content != '':
+                        htm_content += '<br></br>'
+                    if attachment.size >= ctx.guild.filesize_limit:
+                        if filetype == 'Image':
+                            htm_content += f'<img src="{attachment}" alt="{attachment.filename} too large to be logged ({math.ceil(attachment.size/1048576)} MB)">'
+                        elif filetype == 'Video':
+                            htm_content += f'<video src="{attachment}" alt="{attachment.filename} too large to be logged ({math.ceil(attachment.size/1048576)} MB)">'
+                        else:
+                            htm_content += f'<a href="{attachment}">{attachment.filename} ({math.ceil(attachment.size/1048576)} MB)</a>'
+                        txt_log.write(f'\n{attachment.filename} ({math.ceil(attachment.size/1048576)} MB)')
+                    else:
+                        if not closing_message_edited:
+                            await closing_message.edit(embed=embed_creator('Closing Ticket...', 'This may take a while.',
+                                                                           'b'))
+                            closing_message_edited = True
+                        file = await attachment.to_file()
+                        file_log = await bot.get_channel(config.attachment_log_channel_id).send(
+                            content=f'{user} ({user_id}) {message.created_at.strftime("%y-%m-%d %H:%M")}', file=file)
+                        htm_content += f'<a href="{file_log.jump_url}">{attachment.filename}</a>'
+                        txt_log.write(f'\n{file_log.jump_url} ({filetype})')
+                htm_log.write(
+                    f'''
+                    <li class="{htm_class}">
+                    <h2>
+                        <span class="name">
+                            {htm_name}
+                        </span>
+                        <span class="datetime">
+                            {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
+                        </span>
+                    </h2>
+                    <p>{htm_content}</p>
+                    </li>
+                    '''
+                )
+                txt_log.write('\n')
+            htm_log.write('</ul><ul>')
+            for message in thread_messages:
+                htm_log.write(
+                    f'''
+                    <li class="comment">
+                    <h2>
+                        <span class="name">
+                            {html_sanitiser.clean(message.author.name)}
+                        </span>
+                        <span class="datetime">
+                            {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
+                        </span>
+                    </h2>
+                    <p>{html_linkifier.clean(message.content)}</p>
+                    </li>
+                    '''
+                )
+                txt_log.write(f'\n[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name}: '
+                              f'{message.content}')
             htm_log.write(
-                f'''
-                <li class="{htm_class}">
-                <h2>
-                    <span class="name">
-                        {htm_name}
-                    </span>
-                    <span class="datetime">
-                        {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
-                    </span>
-                </h2>
-                <p>{htm_content}</p>
-                </li>
+                '''
+                </ul>
+                </main>
+                <script type="text/javascript">(function(){window['__CF$cv$params']={r:'6da5e8aa0d2172b5',m:'5dLd8.V25IY9gxywoWGKAj7j56QuVn7rur_rHLA1vRY-1644334327-0-AVXmbc6H8HGCfutFMct5cXfa2ZWp0QzIf62ZswYauMCDY5i6r0yH+dRdT2hMg/cTdi9wztDqs4wX3uYu3jlk2xaN/6gYwMbw57+MdRSBJvnkIxd2V2D/VEqQMEfedSczOkFaueNElC0lK5ZgSXq8SKW8U04f95BRGScgpFlUSozUEGpQFejg6K2xskUm4J/77g==',s:[0xf5207b6be0,0xa06951a27f],}})();
+                </script>
+                </body>
+                </html>
                 '''
             )
-            txt_log.write('\n')
-        htm_log.write('</ul><ul>')
-        for message in thread_messages:
+
+    else:
+        # Logging v1 (legacy)
+
+        with open(f'{user_id}.txt', 'w') as txt_log:
+            for message in channel_messages:
+                if len(message.embeds) == 1:
+
+                    if message.embeds[0].description is None:
+                        content = ''
+                    else:
+                        content = message.embeds[0].description
+
+                    if message.embeds[0].title == 'Message Received':
+                        txt_log.write(
+                            f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.embeds[0].footer.text} '
+                            f'(User): {content}')
+                    elif message.embeds[0].title == 'Message Sent':
+                        txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] '
+                                      f'{message.embeds[0].author.name.strip(" (Anonymous)")} (Mod): {content}')
+                    else:
+                        continue
+
+                    for field in message.embeds[0].fields:
+                        txt_log.write(f'\n{field.value}')
+
+                else:
+                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name} (Comment): '
+                                  f'{message.content}')
+                txt_log.write('\n')
+            for message in thread_messages:
+                txt_log.write(f'\n[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name}: '
+                              f'{message.content}')
+
+        with open(f'{user_id}.htm', 'w') as htm_log:
             htm_log.write(
-                f'''
-                <li class="comment">
-                <h2>
-                    <span class="name">
-                        {html_sanitiser.clean(message.author.name)}
-                    </span>
-                    <span class="datetime">
-                        {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
-                    </span>
-                </h2>
-                <p>{html_linkifier.clean(message.content)}</p>
-                </li>
+                '''
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>''' + bot.user.name + '''Log</title>
+<style type="text/css">
+    html { }
+    body { font-size:16px; max-width:1000px; margin: 20px auto; padding:0; font-family:sans-serif; color:white; background:#2D2F33; }
+    main { font-size:1em; line-height:1.3em; }
+    p { white-space:pre-line; }
+    div { }
+    h1 { margin:25px 20px; font-weight:normal; font-size:3em; }
+    h2 { margin:5px; font-size:1em; line-height:1.3em; }
+    li.user h2 { color:lime; }
+    li.staff h2 { color:orangered; }
+    li.comment h2 { color:#6C757D; }
+    span.datetime { color:#8898AA; font-weight:normal; }
+    p { margin:5px; padding:0; }
+    ul { margin-bottom: 50px; padding:0; list-style-type:none; }
+    li { margin:5px; padding:15px; list-style-type:none; background:#222529; border-radius:5px; }
+    img { max-width:100%; }
+    video { max-width:100%; }
+</style>
+<script async src='/cdn-cgi/bm/cv/669835187/api.js'></script></head>
+<body>
+<h1>''' + bot.user.name + '''</h1>
+<main>        
+        <ul>
+                    '''
+            )
+            for message in channel_messages:
+                if len(message.embeds) == 1:
+                    if message.embeds[0].title == 'Message Received':
+                        htm_class = 'user'
+                        name = html_sanitiser.clean(message.embeds[0].footer.text)
+                    elif message.embeds[0].title == 'Message Sent':
+                        htm_class = 'staff'
+                        name = html_sanitiser.clean(message.embeds[0].author.name.removesuffix(' (Anonymous)'))
+                    else:
+                        continue
+                    if message.embeds[0].description is None:
+                        content = ''
+                    else:
+                        content = html_linkifier.clean(message.embeds[0].description)
+                    for i in range(len(message.embeds[0].fields)):
+                        value = message.embeds[0].fields[i].value.split('?', 1)[0]
+                        mimetype = mimetypes.guess_type(value)[0]
+                        if mimetype is not None:
+                            filetype = mimetype.split('/', 1)[0]
+                        else:
+                            filetype = None
+                        if i > 0 or content != '':
+                            content += '<br></br>'
+                        if filetype == 'image':
+                            content += f'<img src="{value}" alt="{value}">'
+                        elif filetype == 'video':
+                            content += f'<video controls><source src="{value}" type="{mimetype}"><a href="{value}">{value}</a></video>'
+                        else:
+                            content += f'<a href="{value}">{value}</a>'
+                else:
+                    htm_class = 'comment'
+                    name = html_sanitiser.clean(message.author.name)
+                    content = html_sanitiser.clean(message.content)
+                htm_log.write(
+                    f'''
+                        <li class="{htm_class}">
+                        <h2>
+                            <span class="name">
+                                {name}
+                            </span>
+                            <span class="datetime">
+                                {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
+                            </span>
+                        </h2>
+                        <p>{content}</p>
+                        </li>
+                        '''
+                )
+            htm_log.write('</ul><ul>')
+            for message in thread_messages:
+                htm_log.write(
+                    f'''
+                        <li class="comment">
+                        <h2>
+                            <span class="name">
+                                {html_sanitiser.clean(message.author.name)}
+                            </span>
+                            <span class="datetime">
+                                {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
+                            </span>
+                        </h2>
+                        <p>{html_linkifier.clean(message.content)}</p>
+                        </li>
+                        '''
+                )
+            htm_log.write(
+                '''
+                </ul>
+                </main>
+                <script type="text/javascript">(function(){window['__CF$cv$params']={r:'6da5e8aa0d2172b5',m:'5dLd8.V25IY9gxywoWGKAj7j56QuVn7rur_rHLA1vRY-1644334327-0-AVXmbc6H8HGCfutFMct5cXfa2ZWp0QzIf62ZswYauMCDY5i6r0yH+dRdT2hMg/cTdi9wztDqs4wX3uYu3jlk2xaN/6gYwMbw57+MdRSBJvnkIxd2V2D/VEqQMEfedSczOkFaueNElC0lK5ZgSXq8SKW8U04f95BRGScgpFlUSozUEGpQFejg6K2xskUm4J/77g==',s:[0xf5207b6be0,0xa06951a27f],}})();
+                </script>
+                </body>
+                </html>
                 '''
             )
-            txt_log.write(f'\n[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name}: '
-                          f'{message.content}')
-        htm_log.write(
-            '''
-            </ul>
-            </main>
-            <script type="text/javascript">(function(){window['__CF$cv$params']={r:'6da5e8aa0d2172b5',m:'5dLd8.V25IY9gxywoWGKAj7j56QuVn7rur_rHLA1vRY-1644334327-0-AVXmbc6H8HGCfutFMct5cXfa2ZWp0QzIf62ZswYauMCDY5i6r0yH+dRdT2hMg/cTdi9wztDqs4wX3uYu3jlk2xaN/6gYwMbw57+MdRSBJvnkIxd2V2D/VEqQMEfedSczOkFaueNElC0lK5ZgSXq8SKW8U04f95BRGScgpFlUSozUEGpQFejg6K2xskUm4J/77g==',s:[0xf5207b6be0,0xa06951a27f],}})();
-            </script>
-            </body>
-            </html>
-            '''
-        )
+
     embed_user = embed_creator('Ticket Closed', config.close_message, 'b', ctx.guild, time=True)
     embed_guild = embed_creator('Ticket Closed', '', 'r', user, ctx.author, anon=False)
     if reason:
