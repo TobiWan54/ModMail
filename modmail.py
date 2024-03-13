@@ -8,12 +8,12 @@ import io
 import contextlib
 import traceback
 import json
+import mimetypes
 import sys
 import functools
 import dataclasses
 import sqlite3
 import aiohttp
-import math
 
 
 class YesNoButtons(discord.ui.View):
@@ -48,7 +48,6 @@ class Config:
     guild_id: int
     category_id: int
     log_channel_id: int
-    attachment_log_channel_id: int
     error_channel_id: int
     helper_role_id: int
     mod_role_id: int
@@ -371,8 +370,8 @@ async def on_message(message):
         attachment_embeds = []
         n = 0
         if message.attachments:
-            await confirmation_message.edit(embed=embed_creator('Sending Message...', 'This may take a while.', 'g',
-                                                                guild))
+            await confirmation_message.edit(embed=embed_creator('Sending Message...', 'This may take a few minutes.',
+                                                                'g', guild))
             for attachment in message.attachments:
                 n += 1
                 total_filesize += attachment.size
@@ -449,7 +448,7 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     files_to_send = []
     for attachment in ctx.message.attachments:
         if attachment.size >= ctx.filesize_limit:
-            await ctx.send(embed=embed_creator('Failed to Send', f'One or more attachments are larger than int({ctx.filesize_limit/1048576}) MB.',
+            await ctx.send(embed=embed_creator('Failed to Send', f'One or more attachments are larger than {ctx.filesize_limit/1024/1024} MB.',
                                                'e'))
             return
         file = io.BytesIO(await attachment.read())
@@ -546,8 +545,7 @@ async def close(ctx, *, reason: str = ''):
     except KeyError:
         pass
 
-    closing_message = await ctx.send(embed=embed_creator('Closing Ticket...', '', 'b'))
-    closing_message_edited = False
+    await ctx.send(embed=embed_creator('Closing Ticket...', '', 'b'))
 
     # Logging
 
@@ -570,7 +568,36 @@ async def close(ctx, *, reason: str = ''):
             except IndexError:
                 thread_messages = []
 
-    with open(f'{user_id}.htm', 'w') as htm_log, open(f'{user_id}.txt', 'w') as txt_log:
+    with open(f'{user_id}.txt', 'w') as txt_log:
+        for message in channel_messages:
+            if len(message.embeds) == 1:
+
+                if message.embeds[0].description is None:
+                    content = ''
+                else:
+                    content = message.embeds[0].description
+
+                if message.embeds[0].title == 'Message Received':
+                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.embeds[0].footer.text} '
+                                  f'(User): {content}')
+                elif message.embeds[0].title == 'Message Sent':
+                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] '
+                                  f'{message.embeds[0].author.name.strip(" (Anonymous)")} (Mod): {content}')
+                else:
+                    continue
+
+                for field in message.embeds[0].fields:
+                    txt_log.write(f'\n{field.value}')
+
+            else:
+                txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name} (Comment): '
+                              f'{message.content}')
+            txt_log.write('\n')
+        for message in thread_messages:
+            txt_log.write(f'\n[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name}: '
+                          f'{message.content}')
+
+    with open(f'{user_id}.htm', 'w') as htm_log:
         htm_log.write(
             '''
 <!doctype html>
@@ -606,71 +633,52 @@ async def close(ctx, *, reason: str = ''):
         )
         for message in channel_messages:
             if len(message.embeds) == 1:
-                if message.embeds[0].description is None:
-                    htm_content = ''
-                    txt_content = ''
-                else:
-                    htm_content = html_linkifier.clean(message.embeds[0].description)
-                    txt_content = message.embeds[0].description
                 if message.embeds[0].title == 'Message Received':
                     htm_class = 'user'
-                    htm_name = html_sanitiser.clean(message.embeds[0].footer.text)
-                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.embeds[0].footer.text} '
-                                  f'(User): {txt_content}')
+                    name = html_sanitiser.clean(message.embeds[0].footer.text)
                 elif message.embeds[0].title == 'Message Sent':
                     htm_class = 'staff'
-                    htm_name = html_sanitiser.clean(message.embeds[0].author.name.removesuffix(' (Anonymous)'))
-                    txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] '
-                                  f'{message.embeds[0].author.name.strip(" (Anonymous)")} (Mod): {txt_content}')
+                    name = html_sanitiser.clean(message.embeds[0].author.name.removesuffix(' (Anonymous)'))
                 else:
                     continue
+                if message.embeds[0].description is None:
+                    content = ''
+                else:
+                    content = html_linkifier.clean(message.embeds[0].description)
+                for i in range(len(message.embeds[0].fields)):
+                    value = message.embeds[0].fields[i].value
+                    mimetype = mimetypes.guess_type(value)[0]
+                    if mimetype is not None:
+                        filetype = mimetype.split('/', 1)[0]
+                    else:
+                        filetype = None
+                    if i > 0 or content != '':
+                        content += '<br></br>'
+                    if filetype == 'image':
+                        content += f'<img src="{value}" alt="{value}">'
+                    elif filetype == 'video':
+                        content += f'<video controls><source src="{value}" type="{mimetype}"><a href="{value}">{value}</a></video>'
+                    else:
+                        content += f'<a href="{value}">{value}</a>'
             else:
                 htm_class = 'comment'
-                htm_name = html_sanitiser.clean(message.author.name)
-                htm_content = html_sanitiser.clean(message.content)
-                txt_log.write(f'[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name} (Comment): '
-                              f'{message.content}')
-            for i in range(len(message.attachments)):
-                attachment = message.attachments[i]
-                if attachment.content_type:
-                    filetype = attachment.content_type.split('/', 1)[0].capitalize()
-                else:
-                    filetype = None
-                if i > 0 or htm_content != '':
-                    htm_content += '<br></br>'
-                if attachment.size >= ctx.guild.filesize_limit:
-                    if filetype == 'Image':
-                        htm_content += f'<img src="{attachment}" alt="{attachment.filename} too large to be logged ({math.ceil(attachment.size/1048576)} MB)">'
-                    elif filetype == 'Video':
-                        htm_content += f'<video src="{attachment}" alt="{attachment.filename} too large to be logged ({math.ceil(attachment.size/1048576)} MB)">'
-                    else:
-                        htm_content += f'<a href="{attachment}">{attachment.filename} ({math.ceil(attachment.size/1048576)} MB)</a>'
-                    txt_log.write(f'\n{attachment.filename} ({math.ceil(attachment.size/1048576)} MB)')
-                else:
-                    if not closing_message_edited:
-                        await closing_message.edit(embed=embed_creator('Closing Ticket...', 'This may take a while.', 'b'))
-                        closing_message_edited = True
-                    file = await attachment.to_file()
-                    file_log = await bot.get_channel(config.attachment_log_channel_id).send(
-                        content=f'{user} ({user_id}) {message.created_at.strftime("%y-%m-%d %H:%M")}', file=file)
-                    htm_content += f'<a href="{file_log.jump_url}">{attachment.filename}</a>'
-                    txt_log.write(f'\n{file_log.jump_url} ({filetype})')
+                name = html_sanitiser.clean(message.author.name)
+                content = html_sanitiser.clean(message.content)
             htm_log.write(
                 f'''
                 <li class="{htm_class}">
                 <h2>
                     <span class="name">
-                        {htm_name}
+                        {name}
                     </span>
                     <span class="datetime">
                         {html_sanitiser.clean(message.created_at.strftime("%y-%m-%d %H:%M"))}
                     </span>
                 </h2>
-                <p>{htm_content}</p>
+                <p>{content}</p>
                 </li>
                 '''
             )
-            txt_log.write('\n')
         htm_log.write('</ul><ul>')
         for message in thread_messages:
             htm_log.write(
@@ -688,8 +696,6 @@ async def close(ctx, *, reason: str = ''):
                 </li>
                 '''
             )
-            txt_log.write(f'\n[{message.created_at.strftime("%y-%m-%d %H:%M")}] {message.author.name}: '
-                          f'{message.content}')
         htm_log.write(
             '''
             </ul>
