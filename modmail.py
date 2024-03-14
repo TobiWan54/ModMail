@@ -57,10 +57,15 @@ class Config:
     close_message: str
     anonymous_tickets: bool
     send_with_command_only: bool
+    channel_ids: [] = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self.channel_ids = [self.log_channel_id, self.error_channel_id]
 
     def update(self, new: dict):
         for key, value in new.items():
             setattr(self, key, value)
+        self.channel_ids = [self.log_channel_id, self.error_channel_id]
 
 
 with open('config.json', 'r') as config_file:
@@ -106,12 +111,14 @@ async def load_tickets():
     category = bot.get_channel(config.category_id)
     tickets.clear()
     for channel in category.text_channels:
-        if channel.topic is not None:
-            try:
-                tickets[int(channel.topic.split()[0])] = channel.id
-            except ValueError:
-                await channel.send(embed=embed_creator('Ticket is Broken', f"Please change this channel's topic to the user's ID, then use `{config.prefix}refresh`", 'e'))
-
+        if channel.id in config.channel_ids:
+            continue
+        try:
+            user_id = [message async for message in channel.history(limit=1, oldest_first=True)][0].content
+            tickets[int(user_id)] = channel.id
+        except (IndexError, ValueError):
+            await channel.send(embed=embed_creator('Invalid User Association', f'Please manually delete this channel.',
+                                                   'e'))
 
 def embed_creator(title, message, colour=None, subject=None, author=None, anon=True, time=False):
     embed = discord.Embed()
@@ -152,7 +159,7 @@ def is_mod(ctx):
 
 
 def is_modmail_channel(ctx):
-    return isinstance(ctx.channel, discord.TextChannel) and ctx.channel.category.id == config.category_id and ctx.channel.topic
+    return isinstance(ctx.channel, discord.TextChannel) and ctx.channel.category.id == config.category_id and ctx.channel.id not in config.channel_ids
 
 
 bot = commands.Bot(command_prefix=config.prefix, intents=discord.Intents.all(), activity=discord.Game('DM to Contact Mods'),
@@ -227,31 +234,21 @@ async def error_handler(error, message=None):
 
 
 async def send_message(message, text, anon):
-    user_id = message.channel.topic.split()[0]
+    user_id = [msg async for msg in message.channel.history(limit=1, oldest_first=True)][0].content
     try:
         user_id = int(user_id)
-    except ValueError:
+        user = bot.get_user(user_id)
+        if user is None:
+            await bot.fetch_user(user_id)
+        elif message.guild not in user.mutual_guilds:
+                await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.',
+                                                               'e'))
+                return
+    except (ValueError, discord.NotFound):
         await message.channel.send(
-            embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config.prefix}refresh`",
+            embed=embed_creator('Failed to Send', 'Invalid user association. Please manually delete this ticket.',
                                 'e'))
         return
-    user = bot.get_user(user_id)
-    if user is not None:
-        if message.guild not in user.mutual_guilds:
-            await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-            return
-    else:
-        try:
-            await bot.fetch_user(user_id)
-        except discord.NotFound:
-            await message.channel.send(
-                embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config.prefix}refresh`. Otherwise, the user have may deleted their account.",
-                                    'e'))
-        else:
-            await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-        return
-
-    print(anon)
 
     channel_embed = embed_creator('Message Sent', text, 'r', user, message.author, anon)
     if anon:
@@ -334,15 +331,14 @@ async def on_message(message):
                         file.write(str(counter))
                 else:
                     ticket_name = f'{message.author.name}'
-                channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id),
-                                                          topic=f'{message.author.id} (User ID, do not change)')
+                channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id))
             except discord.HTTPException as e:
-                del tickets[message.author.id]
                 if 'Contains words not allowed for servers in Server Discovery' in e.text:
-                    channel = await guild.create_text_channel('ticket', category=bot.get_channel(config.category_id),
-                                                              topic=f'{message.author.id} (User ID, do not change)')
+                    channel = await guild.create_text_channel('ticket', category=bot.get_channel(config.category_id))
                 else:
+                    del tickets[message.author.id]
                     raise e from None
+            await channel.send(message.author.id)
             await bot.get_channel(config.log_channel_id).send(embed=embed_creator('New Ticket', '', 'g', message.author))
             embed = embed_creator('New Ticket', '', 'b', message.author, time=True)
             embed.add_field(name='User', value=f'{message.author.mention} ({message.author.id})')
@@ -476,8 +472,8 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     else:
         ticket_name = f'{user.name}'
 
-    channel = await ctx.guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id),
-                                                  topic=f'{user.id} (User ID, do not change)')
+    channel = await ctx.guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id))
+    await channel.send(user.id)
     tickets[user.id] = channel.id
     await bot.get_channel(config.log_channel_id).send(embed=embed_creator('Ticket Created', '', 'r', user, ctx.author, anon=False))
 
@@ -514,7 +510,7 @@ async def close(ctx, *, reason: str = ''):
         await ctx.send(embed=embed_creator('', f'Reason too long: `{len(reason)}` characters. The maximum length for closing reasons is 1024.', 'e'))
         return
 
-    user_id = ctx.channel.topic.split()[0]
+    user_id = [message async for message in ctx.channel.history(limit=1, oldest_first=True)][0].content
     try:
         user_id = int(user_id)
         user = bot.get_user(user_id)
@@ -523,18 +519,15 @@ async def close(ctx, *, reason: str = ''):
     except (ValueError, discord.NotFound):
         user = None
         buttons = YesNoButtons()
-        confirmation = await ctx.send(embed=embed_creator('User Not Found',
-                                                          f"ID retrieved from channel topic as `{user_id}`. Try changing the channel's topic to just the user's ID. Otherwise, the user may have deleted their account.\n\nWould you still like to close the ticket?",
+        confirmation = await ctx.send(embed=embed_creator('Invalid User Association', 'Would you still like to close and log the ticket?',
                                                           'b'), view=buttons)
         await buttons.wait()
         if buttons.value is None:
-            await confirmation.edit(embed=embed_creator('User Not Found',
-                                                        f"ID retrieved from channel topic as `{user_id}`. Try changing the channel's topic to just the user's ID. Otherwise, the user may have deleted their account.\n\nClosing cancelled due to timeout.",
+            await confirmation.edit(embed=embed_creator('Invalid User Association', 'Would you still like to close and log the ticket?',
                                                         'b'), view=None)
             return
         elif not buttons.value:
-            await confirmation.edit(embed=embed_creator('User Not Found',
-                                                        f"ID retrieved from channel topic as `{user_id}`. Try changing the channel's topic to just the user's ID. Otherwise, the user may have deleted their account.\n\nClosing cancelled by moderator.",
+            await confirmation.edit(embed=embed_creator('Invalid User Association', 'Would you still like to close and log the ticket?',
                                                         'b'), view=None)
             return
         else:
@@ -743,30 +736,7 @@ async def snippet(ctx, name: str):
     name = name.lower()
     content = snippets.get(name)
     if content is not None:
-
-        user_id = ctx.channel.topic.split()[0]
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            await ctx.send(embed=embed_creator('Failed to Send', f"User ID found from channel topic: `{user_id}`. This is not a valid ID, please change the channel's topic to just the user's ID, then use `{config.prefix}refresh`", 'e'))
-            return
-        user = bot.get_user(user_id)
-        if user is not None:
-            if ctx.guild not in user.mutual_guilds:
-                await ctx.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-                return
-        else:
-            try:
-                await bot.fetch_user(user_id)
-            except discord.NotFound:
-                await ctx.send(embed=embed_creator('Failed to Send', f"User with ID from channel topic, `{user_id}`, not found. Try changing the channel's topic to just the user's ID, then use `{config.prefix}refresh`. Otherwise, the user may have deleted their account.", 'e'))
-            else:
-                await ctx.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
-            return
-
-        await user.send(embed=embed_creator('Message Received', content, 'r', ctx.guild))
-        await ctx.message.delete()
-        await ctx.send(embed=embed_creator('Message Sent', content, 'r', user, ctx.author))
+        await send_message(ctx.message, content, True)
     else:
         await ctx.send(embed=embed_creator('', f'Snippet `{name}` does not exist.', 'e'))
 
