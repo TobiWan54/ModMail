@@ -87,14 +87,6 @@ except FileNotFoundError:
     with open('blacklist.json', 'w') as blacklist_file:
         json.dump(blacklist, blacklist_file)
 
-try:
-    with open('counter.txt', 'r') as counter_file:
-        counter = int(counter_file.read())
-except FileNotFoundError:
-    with open('counter.txt', 'w') as counter_file:
-        counter_file.write('0')
-        counter = 0
-
 with sqlite3.connect('logs.db') as connection:
     cursor = connection.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS logs (user_id, timestamp, txt_log_url, htm_log_url)')
@@ -322,13 +314,19 @@ async def on_message(message):
             tickets[message.author.id] = 0
             try:
                 if config.anonymous_tickets:
-                    global counter
-                    ticket_name = f'ticket {str(counter).rjust(4, "0")}'
-                    counter += 1
-                    if counter == 10000:
-                        counter = 0
-                    with open('counter.txt', 'w') as file:
-                        file.write(str(counter))
+                    ticket_name = 'ticket 0001'
+                    try:
+                        with open('counter.txt', 'r+') as file:
+                            counter = int(file.read())
+                            counter += 1
+                            if counter >= 10000:
+                                counter = 1
+                            ticket_name = f'ticket {str(counter).rjust(4, "0")}'
+                            file.seek(0)
+                            file.write(str(counter))
+                    except (ValueError, FileNotFoundError):
+                        with open('counter.txt', 'w+') as file:
+                            file.write('1')
                 else:
                     ticket_name = f'{message.author.name}'
                 channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id))
@@ -462,13 +460,19 @@ async def send(ctx, user: discord.User, *, message: str = ''):
         channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
 
     if config.anonymous_tickets:
-        global counter
-        ticket_name = f'ticket {str(counter).rjust(4, "0")}'
-        counter += 1
-        if counter == 10000:
-            counter = 0
-        with open('counter.txt', 'w') as file:
-            file.write(str(counter))
+        ticket_name = 'ticket 0001'
+        try:
+            with open('counter.txt', 'r+') as file:
+                counter = int(file.read())
+                counter += 1
+                if counter >= 10000:
+                    counter = 1
+                ticket_name = f'ticket {str(counter).rjust(4, "0")}'
+                file.seek(0)
+                file.write(str(counter))
+        except (ValueError, FileNotFoundError):
+            with open('counter.txt', 'w+') as file:
+                file.write('1')
     else:
         ticket_name = f'{user.name}'
 
