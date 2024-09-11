@@ -17,9 +17,9 @@ However, this bot has a few additional features that make it unique:
 This allows mods to discuss freely, without the risk of accidentally sending a rude message to the user! From v.1.1.0 onwards there is also an
 option to send messages only with the commands !reply and !areply (anonymous).
 
-- **!search:** Allows you to retrieve the logs of a user's previous tickets, and to search for specific phrases within them.
+- **search:** Allows you to retrieve the logs of a user's previous tickets, and to search for specific phrases within them.
 
-- **!send:** Creates a new ticket and sends an anonymous message to a user that does not already have a ticket open.
+- **send:** Creates a new ticket and sends an anonymous message to a user that does not already have a ticket open.
 
 Once you have the bot running, the !help command will show you a list of all the available commands and their sub-commands.
 
@@ -69,4 +69,4 @@ The required/working versions of these packages are listed in `requirements.txt`
 
 [discord.py](https://github.com/Rapptz/discord.py)
 
-[aiohttp](https://github.com/aio-libs/aiohttp) (this is installed with discord.py)
+[aiohttp](https://github.com/aio-libs/aiohttp)
