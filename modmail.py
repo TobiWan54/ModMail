@@ -742,6 +742,7 @@ async def snippet(ctx, name: str):
 
 
 @snippet.command()
+@commands.check(is_helper)
 async def view(ctx, name: str = ''):
     """Shows a named snippet, or all snippets if no name is given"""
 
@@ -765,6 +766,7 @@ async def view(ctx, name: str = ''):
 
 
 @snippet.command()
+@commands.check(is_helper)
 async def add(ctx, name: str, *, content: str):
 
     name = name.lower()
@@ -794,6 +796,7 @@ async def add(ctx, name: str, *, content: str):
 
 
 @snippet.command()
+@commands.check(is_helper)
 async def edit(ctx, name: str, *, content: str):
 
     name = name.lower()
@@ -810,6 +813,7 @@ async def edit(ctx, name: str, *, content: str):
 
 
 @snippet.command()
+@commands.check(is_helper)
 async def remove(ctx, name: str):
 
     name = name.lower()
@@ -833,6 +837,7 @@ async def blacklist(ctx):
 
 
 @blacklist.command()
+@commands.check(is_mod)
 async def view(ctx):
     """Shows all blacklisted users"""
 
@@ -843,6 +848,7 @@ async def view(ctx):
 
 
 @blacklist.command()
+@commands.check(is_mod)
 async def check(ctx, user: discord.User):
     """Checks if a user is blacklisted"""
 
@@ -853,6 +859,7 @@ async def check(ctx, user: discord.User):
 
 
 @blacklist.command()
+@commands.check(is_mod)
 async def add(ctx, user: discord.User, *, reason: str = ''):
     """Blacklists a user"""
 
@@ -899,6 +906,7 @@ async def add(ctx, user: discord.User, *, reason: str = ''):
 
 
 @blacklist.command()
+@commands.check(is_mod)
 async def remove(ctx, user_id: int):
     """Un-blacklists a user"""
 
