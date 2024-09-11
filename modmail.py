@@ -1,3 +1,5 @@
+import time
+
 import discord
 from discord.ext import commands
 import bleach
@@ -15,21 +17,26 @@ import dataclasses
 import sqlite3
 import aiohttp
 
-
 class YesNoButtons(discord.ui.View):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, timeout: int):
+        super().__init__(timeout=timeout)
         self.value = None
 
-    @discord.ui.button(label='Yes', style=discord.ButtonStyle.green)
+    @discord.ui.button(label='\u2714', style=discord.ButtonStyle.green)
     async def yes(self, *args):
         self.value = True
         self.stop()
 
-    @discord.ui.button(label='No', style=discord.ButtonStyle.red)
+    @discord.ui.button(label='\u2718', style=discord.ButtonStyle.red)
     async def no(self, *args):
         self.value = False
         self.stop()
+
+
+class UserInput(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+        self.value = None
 
 
 class HelpCommand(commands.DefaultHelpCommand):
@@ -92,25 +99,15 @@ with sqlite3.connect('logs.db') as connection:
     cursor.execute('CREATE TABLE IF NOT EXISTS logs (user_id, timestamp, txt_log_url, htm_log_url)')
     connection.commit()
 
+with sqlite3.connect('tickets.db') as connection:
+    cursor = connection.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS tickets (user_id, channel_id)')
+    connection.commit()
+
 
 html_sanitiser = bleach.sanitizer.Cleaner()
-html_linkifier = bleach.sanitizer.Cleaner(filters=[functools.partial(bleach.linkifier.LinkifyFilter, callbacks=[])])
+html_linkifier = bleach.sanitizer.Cleaner(filters=[functools.partial(bleach.linkifier.LinkifyFilter)])
 
-tickets = {}
-
-
-async def load_tickets():
-    category = bot.get_channel(config.category_id)
-    tickets.clear()
-    for channel in category.text_channels:
-        if channel.id in config.channel_ids:
-            continue
-        try:
-            user_id = [message async for message in channel.history(limit=1, oldest_first=True)][0].content
-            tickets[int(user_id)] = channel.id
-        except (IndexError, ValueError):
-            await channel.send(embed=embed_creator('Invalid User Association', f'Please manually delete this channel.',
-                                                   'e'))
 
 def embed_creator(title, message, colour=None, subject=None, author=None, anon=True, time=False):
     embed = discord.Embed()
@@ -142,6 +139,48 @@ def embed_creator(title, message, colour=None, subject=None, author=None, anon=T
     return embed
 
 
+async def ticket_creator(user: discord.User, guild: discord.Guild):
+    try:
+        if config.anonymous_tickets:
+            ticket_name = 'ticket 0001'
+            try:
+                with open('counter.txt', 'r+') as file:
+                    counter = int(file.read())
+                    counter += 1
+                    if counter >= 10000:
+                        counter = 1
+                    ticket_name = f'ticket {str(counter).rjust(4, "0")}'
+                    file.seek(0)
+                    file.write(str(counter))
+            except (ValueError, FileNotFoundError):
+                with open('counter.txt', 'w+') as file:
+                    file.write('1')
+        else:
+            ticket_name = f'{user.name}'
+        channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id))
+    except discord.HTTPException as e:
+        if 'Contains words not allowed for servers in Server Discovery' in e.text:
+            channel = await guild.create_text_channel('ticket', category=bot.get_channel(config.category_id))
+        else:
+            raise e from None
+    with sqlite3.connect('tickets.db') as conn:
+        curs = conn.cursor()
+        curs.execute('INSERT INTO tickets VALUES (?, ?)', (user.id, channel.id))
+        conn.commit()
+    await bot.get_channel(config.log_channel_id).send(embed=embed_creator('New Ticket', '', 'g', user))
+    embed = embed_creator('New Ticket', '', 'b', user, time=True)
+    embed.add_field(name='User', value=f'{user.mention} ({user.id})')
+    header = await channel.send(embed=embed)
+    if 'SEVEN_DAY_THREAD_ARCHIVE' in guild.features:
+        duration = 10080
+    elif 'THREE_DAY_THREAD_ARCHIVE' in guild.features:
+        duration = 4320
+    else:
+        duration = 1440
+    await header.create_thread(name=f'Discussion for {user.name}', auto_archive_duration=duration)
+    return channel
+
+
 def is_helper(ctx):
     return ctx.guild is not None and ctx.author.top_role >= ctx.guild.get_role(config.helper_role_id)
 
@@ -154,15 +193,14 @@ def is_modmail_channel(ctx):
     return isinstance(ctx.channel, discord.TextChannel) and ctx.channel.category.id == config.category_id and ctx.channel.id not in config.channel_ids
 
 
-bot = commands.Bot(command_prefix=config.prefix, intents=discord.Intents.all(), activity=discord.Game('DM to Contact Mods'),
-                   help_command=HelpCommand())
+bot = commands.Bot(command_prefix=config.prefix, intents=discord.Intents.all(),
+                   activity=discord.Game('DM to Contact Mods'), help_command=HelpCommand())
 
 
 @bot.event
 async def on_ready():
     await bot.wait_until_ready()
     print(f'{bot.user.name} has connected to Discord!')
-    await load_tickets()
 
 
 async def error_handler(error, message=None):
@@ -226,19 +264,21 @@ async def error_handler(error, message=None):
 
 
 async def send_message(message, text, anon):
-    user_id = [msg async for msg in message.channel.history(limit=1, oldest_first=True)][0].content
+    with sqlite3.connect('tickets.db') as conn:
+        curs = conn.cursor()
+        res = curs.execute('SELECT user_id FROM tickets WHERE channel_id=?', (message.channel.id, ))
+        user_id = res.fetchone()
     try:
-        user_id = int(user_id)
+        user_id = user_id[0]
         user = bot.get_user(user_id)
         if user is None:
             await bot.fetch_user(user_id)
         elif message.guild not in user.mutual_guilds:
-                await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.',
-                                                               'e'))
-                return
-    except (ValueError, discord.NotFound):
+            await message.channel.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
+            return
+    except (ValueError, TypeError, discord.NotFound):
         await message.channel.send(
-            embed=embed_creator('Failed to Send', 'Invalid user association. Please manually delete this ticket.',
+            embed=embed_creator('Failed to Send', f'User may have deleted their account. Please close or manually delete this ticket.',
                                 'e'))
         return
 
@@ -305,56 +345,25 @@ async def on_message(message):
             return
 
         guild = bot.get_guild(config.guild_id)
-        ticket_id = tickets.get(message.author.id)
-        if ticket_id == 0:
-            return
-        ticket_create = False
-        if ticket_id is None:
+
+        with sqlite3.connect('tickets.db') as conn:
+            curs = conn.cursor()
+            res = curs.execute('SELECT channel_id FROM tickets WHERE user_id=?', (message.author.id, ))
+            channel_id = res.fetchone()
+
+            channel = None
+            if channel_id:
+                channel_id = channel_id[0]
+                channel = bot.get_channel(channel_id)
+                if channel is None:
+                    curs.execute('DELETE FROM tickets WHERE channel_id=?', (channel_id,))
+                    conn.commit()
+
+        if channel is None:
+            channel = await ticket_creator(message.author, guild)
             ticket_create = True
-            tickets[message.author.id] = 0
-            try:
-                if config.anonymous_tickets:
-                    ticket_name = 'ticket 0001'
-                    try:
-                        with open('counter.txt', 'r+') as file:
-                            counter = int(file.read())
-                            counter += 1
-                            if counter >= 10000:
-                                counter = 1
-                            ticket_name = f'ticket {str(counter).rjust(4, "0")}'
-                            file.seek(0)
-                            file.write(str(counter))
-                    except (ValueError, FileNotFoundError):
-                        with open('counter.txt', 'w+') as file:
-                            file.write('1')
-                else:
-                    ticket_name = f'{message.author.name}'
-                channel = await guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id))
-            except discord.HTTPException as e:
-                if 'Contains words not allowed for servers in Server Discovery' in e.text:
-                    channel = await guild.create_text_channel('ticket', category=bot.get_channel(config.category_id))
-                else:
-                    del tickets[message.author.id]
-                    raise e from None
-            await channel.send(message.author.id)
-            await bot.get_channel(config.log_channel_id).send(embed=embed_creator('New Ticket', '', 'g', message.author))
-            embed = embed_creator('New Ticket', '', 'b', message.author, time=True)
-            embed.add_field(name='User', value=f'{message.author.mention} ({message.author.id})')
-            header = await channel.send(embed=embed)
-            if 'SEVEN_DAY_THREAD_ARCHIVE' in guild.features:
-                duration = 10080
-            elif 'THREE_DAY_THREAD_ARCHIVE' in guild.features:
-                duration = 4320
-            else:
-                duration = 1440
-            await header.create_thread(name=f'Discussion for {message.author.name}', auto_archive_duration=duration)
-            tickets[message.author.id] = channel.id
         else:
-            channel = bot.get_channel(ticket_id)
-            if channel is None:
-                del tickets[message.author.id]
-                await on_message(message)
-                return
+            ticket_create = False
 
         confirmation_message = await message.channel.send(embed=embed_creator('Sending Message...', '', 'g', guild))
         ticket_embed = embed_creator('Message Received', message.content, 'g', message.author)
@@ -381,6 +390,7 @@ async def on_message(message):
             for i in range(len(files)):
                 await channel.send(embed=attachment_embeds[i], file=files[i])
         await confirmation_message.edit(embed=user_embed)
+
         if ticket_create:
             await message.channel.send(embed=embed_creator('Ticket Created', config.open_message, 'b', guild))
 
@@ -428,10 +438,20 @@ async def send(ctx, user: discord.User, *, message: str = ''):
         await ctx.send(embed=embed_creator('', 'I cannot DM myself!', 'e'))
         return
 
-    ticket_id = tickets.get(user.id)
-    if ticket_id is not None:
-        await ctx.send(embed=embed_creator('', f'A ticket for this user already exists: <#{ticket_id}>', 'e'))
-        return
+    with sqlite3.connect('tickets.db') as conn:
+        curs = conn.cursor()
+        res = curs.execute('SELECT channel_id FROM tickets WHERE user_id=?', (user.id, ))
+        channel_id = res.fetchone()
+
+        if channel_id:
+            channel_id = channel_id[0]
+            channel = bot.get_channel(channel_id)
+            if channel is None:
+                curs.execute('DELETE FROM tickets WHERE channel_id=?', (channel_id,))
+                conn.commit()
+            else:
+                await ctx.send(embed=embed_creator('', f'A ticket for this user already exists: <#{channel_id}>', 'e'))
+                return
 
     if ctx.guild not in user.mutual_guilds:
         await ctx.send(embed=embed_creator('Failed to Send', 'User not in server.', 'e'))
@@ -459,46 +479,17 @@ async def send(ctx, user: discord.User, *, message: str = ''):
     for index, attachment in enumerate(user_message.attachments):
         channel_embed.add_field(name=f'Attachment {index + 1}', value=attachment.url, inline=False)
 
-    if config.anonymous_tickets:
-        ticket_name = 'ticket 0001'
-        try:
-            with open('counter.txt', 'r+') as file:
-                counter = int(file.read())
-                counter += 1
-                if counter >= 10000:
-                    counter = 1
-                ticket_name = f'ticket {str(counter).rjust(4, "0")}'
-                file.seek(0)
-                file.write(str(counter))
-        except (ValueError, FileNotFoundError):
-            with open('counter.txt', 'w+') as file:
-                file.write('1')
-    else:
-        ticket_name = f'{user.name}'
+    ticket_channel = await ticket_creator(user, ctx.guild)
+    await ticket_channel.send(embed=channel_embed)
 
-    channel = await ctx.guild.create_text_channel(ticket_name, category=bot.get_channel(config.category_id))
-    await channel.send(user.id)
-    tickets[user.id] = channel.id
     await bot.get_channel(config.log_channel_id).send(embed=embed_creator('Ticket Created', '', 'r', user, ctx.author, anon=False))
-
-    embed = embed_creator('Ticket Created by Moderator', '', 'b', user, time=True)
-    embed.add_field(name='User', value=f'{user.mention} ({user.id})')
-    header = await channel.send(embed=embed)
-
-    if 'SEVEN_DAY_THREAD_ARCHIVE' in ctx.guild.features:
-        duration = 10080
-    elif 'THREE_DAY_THREAD_ARCHIVE' in ctx.guild.features:
-        duration = 4320
-    else:
-        duration = 1440
-    await header.create_thread(name=f'Discussion for {user.name}', auto_archive_duration=duration)
 
     files_to_send = []
     for file in files:
         file[0].seek(0)
         files_to_send.append(discord.File(file[0], file[1]))
-    await channel.send(embed=channel_embed, files=files_to_send)
-    await ctx.channel.send(embed=embed_creator('New Message Sent', f'Ticket: {channel.mention}', 'r', time=False))
+
+    await ctx.channel.send(embed=embed_creator('New Message Sent', f'Ticket: {ticket_channel.mention}', 'r', time=False))
 
 
 @bot.command()
@@ -514,33 +505,38 @@ async def close(ctx, *, reason: str = ''):
         await ctx.send(embed=embed_creator('', f'Reason too long: `{len(reason)}` characters. The maximum length for closing reasons is 1024.', 'e'))
         return
 
-    user_id = [message async for message in ctx.channel.history(limit=1, oldest_first=True)][0].content
+    with sqlite3.connect('tickets.db') as conn:
+        curs = conn.cursor()
+        res = curs.execute('SELECT user_id FROM tickets WHERE channel_id=?', (ctx.channel.id, ))
+        user_id = res.fetchone()
+
+    error_message = ('Database Corrupted', 'This ticket is unlikely to be fixable. Would you still like to close and log it?')
     try:
-        user_id = int(user_id)
+        if user_id:
+            error_message = ('Invalid User Association', 'This is probably because the user has deleted their account. Would you still like to close and log the ticket?')
+        user_id = user_id[0]
         user = bot.get_user(user_id)
         if user is None:
             user = await bot.fetch_user(user_id)
-    except (ValueError, discord.NotFound):
+    except (ValueError, TypeError, discord.NotFound):
         user = None
-        buttons = YesNoButtons()
-        confirmation = await ctx.send(embed=embed_creator('Invalid User Association', 'Would you still like to close and log the ticket?',
-                                                          'b'), view=buttons)
+        buttons = YesNoButtons(60)
+        confirmation = await ctx.send(embed=embed_creator(*error_message,'b'), view=buttons)
         await buttons.wait()
         if buttons.value is None:
-            await confirmation.edit(embed=embed_creator('Invalid User Association', 'Would you still like to close and log the ticket?',
+            await confirmation.edit(embed=embed_creator(error_message[0], 'Close cancelled due to timeout.',
                                                         'b'), view=None)
             return
-        elif not buttons.value:
-            await confirmation.edit(embed=embed_creator('Invalid User Association', 'Would you still like to close and log the ticket?',
+        if buttons.value is False:
+            await confirmation.edit(embed=embed_creator(error_message[0], 'Close cancelled by moderator.',
                                                         'b'), view=None)
             return
-        else:
-            await confirmation.edit(view=None)
+        await confirmation.delete()
 
-    try:
-        del tickets[user_id]
-    except KeyError:
-        pass
+    with sqlite3.connect('tickets.db') as conn:
+        curs = conn.cursor()
+        curs.execute('DELETE FROM tickets WHERE channel_id=?', (ctx.channel.id, ))
+        conn.commit()
 
     await ctx.send(embed=embed_creator('Closing Ticket...', '', 'b'))
 
@@ -714,7 +710,7 @@ async def close(ctx, *, reason: str = ''):
 
     with sqlite3.connect('logs.db') as conn:
         curs = conn.cursor()
-        curs.execute(f'INSERT INTO logs VALUES (?, ?, ?, ?)',
+        curs.execute('INSERT INTO logs VALUES (?, ?, ?, ?)',
                      (user_id, int(ctx.channel.created_at.timestamp()), log.attachments[0].url, log.attachments[1].url))
         conn.commit()
 
@@ -872,13 +868,13 @@ async def add(ctx, user: discord.User, *, reason: str = ''):
     else:
         query_msg = f'Are you sure you want to blacklist **{user}**? They are not in this server, and will not receive a notifying message.'
 
-    buttons = YesNoButtons()
+    buttons = YesNoButtons(60)
     confirmation = await ctx.send(embed=embed_creator('Confirmation', query_msg, 'b'), view=buttons)
     await buttons.wait()
     if buttons.value is None:
         await confirmation.edit(embed=embed_creator('', 'Blacklisting cancelled due to timeout.', 'b'), view=None)
         return
-    if not buttons.value:
+    if buttons.value is False:
         await confirmation.edit(embed=embed_creator('', 'Blacklisting cancelled by moderator.', 'b'), view=None)
         return
     blacklist_list.append(user.id)
@@ -929,20 +925,20 @@ async def search(ctx, user: discord.User, *, search_term: str = ''):
     embeds = [embed_creator(f'Tickets for {user}', '', 'b')]
     with sqlite3.connect('logs.db') as conn:
         curs = conn.cursor()
-        curs.execute(f'SELECT timestamp, txt_log_url, htm_log_url FROM logs WHERE user_id = ?', (user.id,))
+        curs.execute('SELECT timestamp, txt_log_url, htm_log_url FROM logs WHERE user_id = ?', (user.id,))
 
-    async with aiohttp.ClientSession() as session:
-        for timestamp, txt_log_url, htm_log_url in curs.fetchall():
-            if search_term:
-                async with session.get(txt_log_url) as response:
-                    text_log = await response.read()
-                    if search_term not in text_log.decode('utf-8').lower():
-                        continue
+        async with aiohttp.ClientSession() as session:
+            for timestamp, txt_log_url, htm_log_url in curs.fetchall():
+                if search_term:
+                    async with session.get(txt_log_url) as response:
+                        text_log = await response.read()
+                        if search_term not in text_log.decode('utf-8').lower():
+                            continue
 
-            if len(embeds[-1].description) > 3900:
-                embeds.append(embed_creator('', '', 'b'))
+                if len(embeds[-1].description) > 3900:
+                    embeds.append(embed_creator('', '', 'b'))
 
-            embeds[-1].description += f'• <t:{int(timestamp)}:D> {htm_log_url}\n'
+                embeds[-1].description += f'• <t:{int(timestamp)}:D> {htm_log_url}\n'
 
     if searching is not None:
         await searching.delete()
@@ -959,11 +955,10 @@ async def ping(ctx):
 @bot.command()
 @commands.check(is_helper)
 async def refresh(ctx):
-    """Re-reads the external config file, and may fix some ticket-related issues"""
+    """Re-reads the external config file"""
 
     with open('config.json', 'r') as file:
         config.update(json.load(file))
-    await load_tickets()
     await ctx.message.add_reaction('\u2705')
 
 

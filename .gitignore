@@ -1,5 +1,6 @@
 *.json
 *.db
+*.sqlite
 prod.py
 counter.txt
 .idea/
