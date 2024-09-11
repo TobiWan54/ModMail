@@ -252,8 +252,6 @@ async def error_handler(error, message=None):
 
     tb = "".join(traceback.format_exception(error))
     if len(tb) > 2000:
-        with open('error.txt', 'w') as tb_file:
-            tb_file.write(tb)
         await bot.get_user(config.bot_owner_id).send(
             file=discord.File(io.BytesIO(tb.encode('utf-8')), filename='error.txt'), embed=embed)
         await bot.get_channel(config.error_channel_id).send(
