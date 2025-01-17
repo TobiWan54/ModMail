@@ -33,7 +33,7 @@ The script requires Python 3.10 or higher and the packages listed under Dependan
 
 ### Configuration
 Fill out [config.json](templates/config.json) with your own values, and put it in the same 
-directory as `modmail.py`. Then run the script, and your bot will be online!
+directory as [modmail.py](modmail.py). Then run the script, and your bot will be online!
 
 Snippets are stored in `snippets.json`, the blacklist is stored in `blacklist.json` and ticket logs are indexed in the SQLite database `logs.db`.
 Along with `counter.txt` these are automatically created by the script, so do not delete them
