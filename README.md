@@ -36,7 +36,7 @@ Fill out [config.json](templates/config.json) with your own values, and put it i
 directory as [modmail.py](modmail.py). Then run the script, and your bot will be online!
 
 Snippets are stored in `snippets.json`, the blacklist is stored in `blacklist.json` and ticket logs are indexed in the SQLite database `logs.db`.
-Along with `counter.txt` these are automatically created by the script, so do not delete them
+Along with `counter.txt` these are automatically created by the script, so do not delete them.
 
 I would recommend storing your own external backups, especially of `logs.db` because this index cannot be recovered if lost.
 
