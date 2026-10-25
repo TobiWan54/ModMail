@@ -2866,7 +2866,8 @@ async def close_ticket_thread(
             transcript = summary_file.read()
         if transcript.strip():
             response = await openai_client.chat.completions.create(
-                model='gpt-4o',
+                model='gpt-6-luna',
+                reasoning_effort='none',
                 messages=[
                     {
                         'role': 'system',
@@ -2971,7 +2972,8 @@ async def detect_language(text: str) -> str:
     """Identify the language of the given text."""
     try:
         response = await openai_client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-6-luna',
+            reasoning_effort='none',
             messages=[
                 {
                     'role': 'system',
@@ -2990,7 +2992,7 @@ async def detect_language(text: str) -> str:
         return 'unknown'
 
 async def translate_text(text: str) -> str:
-    """Translate provided text to English using GPT-4o."""
+    """Translate provided text to English using GPT-6 Luna."""
 
     if not text.strip():
         return text
@@ -3002,7 +3004,8 @@ async def translate_text(text: str) -> str:
     try:
         # Updated prompt for clearer translations without disclaimers
         response = await openai_client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-6-luna',
+            reasoning_effort='none',
             messages=[
                 {
                     'role': 'system',
@@ -3019,9 +3022,9 @@ async def translate_text(text: str) -> str:
     except Exception:
         return text
 
-# Feature: translate moderator replies into arbitrary languages for users using GPT-4o
+# Feature: translate moderator replies into arbitrary languages for users using GPT-6 Luna
 async def translate_to_language(text: str, language: str, *, use_cache: bool = False) -> str:
-    """Translate provided text to the specified language using GPT-4o."""
+    """Translate provided text to the specified language using GPT-6 Luna."""
 
     if not text.strip():
         return text
@@ -3035,7 +3038,8 @@ async def translate_to_language(text: str, language: str, *, use_cache: bool = F
     try:
         # Updated prompt for translating moderator messages
         response = await openai_client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-6-luna',
+            reasoning_effort='none',
             messages=[
                 {
                     'role': 'system',
